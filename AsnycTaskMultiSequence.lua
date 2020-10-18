@@ -1,36 +1,38 @@
 
+--串行加载策略
+local AsnycTaskMultiSequence = {}
 
---支持串行加载
---支持并行加载
---标志位控制
+function AsnycTaskMultiSequence:SetParam()
+    self.curor = 1
+end
 
-local asnycTaskMultiSequence = {}
-
-function asnycTaskMultiSequence:LoadTaskList(taskList)
+--串行加载Task列表
+function AsnycTaskMultiSequence:LoadTaskList(taskList)
     self.taskList = taskList
     self.curor = 1
-    taskList[self.curor]:SetMulti(self, 1 << (i-1))
-    taskList[self.curor]:LoadTask()
 end
 
-function asnycTaskMultiSequence:onTaskFinish(bit)
-    self.curSuccess = self.curSuccess & bit
+function AsnycTaskMultiSequence:NextTask()
     if self.curor < #self.taskList then
         self.curor = self.curor + 1
-        self.taskList[self.curor]:SetMulti(self, 1 << (self.curor-1))
+        self.taskList[self.curor]:SetMulti(self)
         self.taskList[self.curor]:LoadTask()
     else
         self:postTask()
     end
 end
 
-function asnycTaskMultiSequence:onTaskError(bit)
-    self.curError = self.curError & bit
-    if self.curor < #self.taskList then
-        self.curor = self.curor + 1
-        self.taskList[self.curor]:SetMulti(self, 1 << (self.curor-1))
-        self.taskList[self.curor]:LoadTask()
-    else
-        self:postTask()
-    end
+--某个任务加载成功
+function AsnycTaskMultiSequence:onTaskFinish()
+    self:NextTask()
+end
+
+--某个任务加载失败
+function AsnycTaskMultiSequence:onTaskError()
+    self:NextTask()
+end
+
+--任务加载结束后，执行的回调
+function AsnycTaskMultiSequence:postTask()
+    self:onAllTaskFinish()
 end

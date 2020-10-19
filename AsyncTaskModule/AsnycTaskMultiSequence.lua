@@ -9,10 +9,11 @@ end
 
 --串行加载Task列表
 function AsnycTaskMultiSequence:LoadTaskList()
-    self.curor = 1
+    self.curor = 0
     self:NextTask()
 end
 
+--执行下一个加载任务
 function AsnycTaskMultiSequence:NextTask()
     local taskList = self.taskList
     if taskList ~= nil then

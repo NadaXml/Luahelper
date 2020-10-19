@@ -15,6 +15,11 @@ function AsyncTaskMultiBase:SetParam(taskList)
     self.bAllReady = true
 end
 
+--加载某个对象
+function AsyncTaskMultiBase:LoadTaskList()
+    --需要打开遮罩,禁止操作
+end
+
 --Task加载成功
 function AsyncTaskMultiBase:onTaskFinish(task)
 end

@@ -1,8 +1,14 @@
 --加载策略基类
-local AsyncTaskMultiBase = {}
+local AsyncTaskMultiBase = Class({})
+local AssetManage = Assets.req("AsyncTaskModule.AsyncManage")
+
+
+function AsyncTaskMultiBase:ctor()
+end
 
 --加载策略参数
-function AsyncTaskMultiBase:SetParam()
+function AsyncTaskMultiBase:SetParam(taskList)
+    self.taskList = taskList
     --加载被中断，需要在所有加载完成后，删除Multi对象
     self.bIsRemove = false
     --所有所有加载过程结束
@@ -14,7 +20,7 @@ function AsyncTaskMultiBase:onTaskFinish(task)
 end
 
 --Task加载失败
-function AsyncTaskMultiBase:OnTaskError(task)
+function AsyncTaskMultiBase:onTaskError(task)
 end
 
 
@@ -33,7 +39,6 @@ end
 
 --单个ask过程结束触发的回调
 function AsyncTaskMultiBase:postTask()
-
 end
 
 function AsyncTaskMultiBase:StopTaskMulti()
@@ -47,3 +52,5 @@ function AsyncTaskMultiBase:StopTaskMulti()
         self.bIsRemove = true
     end
 end
+
+return AsyncTaskMultiBase

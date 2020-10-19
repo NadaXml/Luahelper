@@ -1,9 +1,10 @@
 
 --并行加载
-local AsyncTaskMultiParallel = {}
+local AsyncTaskMultiParallel = Class({}, Assets.req("AsyncTaskModule.AsyncLoaderBase"))
 
 --加载策略参数初始化
-function AsyncTaskMultiParallel:SetParam()
+function AsyncTaskMultiParallel:SetParam(taskList)
+    self.getSuper(self, AsyncTaskMultiParallel):SetParam(taskList)
     --所有加载成功标志位
     self.maxBit = 0
     --当前记载进度标志位
@@ -31,13 +32,15 @@ function AsyncTaskMultiParallel:onTaskError(task)
 end
 
 --并行加载Task列表
-function AsyncTaskMultiParallel:LoadTaskList(taskList)
-    self.taskList = taskList
-    for i=1, #taskList do
-        local tsk = taskList[i]
-        self.task2bit[tsk] = 1 << (i-1)
-        tsk:SetMulti(self)
-        tsk:LoadTask()
+function AsyncTaskMultiParallel:LoadTaskList()
+    if self.taskList ~= nil then
+        local taskList = self.taskList
+        for i=1, #taskList do
+            local tsk = taskList[i]
+            self.task2bit[tsk] = 1 << (i-1)
+            tsk:SetMulti(self)
+            tsk:LoadTask()
+        end
     end
 end
 
@@ -48,3 +51,5 @@ function AsyncTaskMultiParallel:postTask()
         self:onAllTaskFinish()
     end
 end
+
+return AsyncTaskMultiParallel

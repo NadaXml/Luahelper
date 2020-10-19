@@ -2,24 +2,22 @@
 --需要统一生命周期和数据管理
 --也需要pool管理
 
-
-local AsyncManage = {}
+local AsyncManage = Class({})
 
 function AsyncManage:Init()
     self.allTaskMap = {}
-    self.allTaskMultiMap = {} 
+    self.allTaskMultiMap = {}
 end
 
 --创建单个异步任务
 function AsyncManage:CreateTask(key, path, finish, err)
-    local at = AsyncTask:New(path, finish, err)
-    at:SetKey(key)
+    local at = AsyncTask:New(key, path, finish, err)
     self.allTaskMap[key] = at
 end
 
 --得到一个异步任务，多个任务用
 function AsyncManage:ObtainTask(path, finish, err)
-    local at = AsyncTask:New(path, finish, err)
+    local at = AsyncTask:New(nil, path, finish, err)
     return at
 end
 
@@ -46,3 +44,5 @@ function AsyncManage:FindTaskMulti(key)
 end
 
 --是否要保存数据，或者直接闭包保存
+
+return AsyncManage

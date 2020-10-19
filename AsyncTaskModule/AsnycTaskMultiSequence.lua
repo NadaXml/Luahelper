@@ -1,22 +1,29 @@
 
 --串行加载策略
-local AsnycTaskMultiSequence = {}
+local AsnycTaskMultiSequence = Class({}, Assets.req("AsyncTaskModule.AsyncLoaderBase"))
 
-function AsnycTaskMultiSequence:SetParam()
+function AsnycTaskMultiSequence:SetParam(taskList)
+    self.getSuper(self, AsnycTaskMultiSequence, taskList)
     self.curor = 1
 end
 
 --串行加载Task列表
-function AsnycTaskMultiSequence:LoadTaskList(taskList)
-    self.taskList = taskList
+function AsnycTaskMultiSequence:LoadTaskList()
     self.curor = 1
+    self:NextTask()
 end
 
 function AsnycTaskMultiSequence:NextTask()
-    if self.curor < #self.taskList then
+    local taskList = self.taskList
+    if taskList ~= nil then
+        --加载为空
+        return
+    end
+
+    if self.curor < #taskList then
         self.curor = self.curor + 1
-        self.taskList[self.curor]:SetMulti(self)
-        self.taskList[self.curor]:LoadTask()
+        taskList[self.curor]:SetMulti(self)
+        taskList[self.curor]:LoadTask()
     else
         self:postTask()
     end
@@ -36,3 +43,5 @@ end
 function AsnycTaskMultiSequence:postTask()
     self:onAllTaskFinish()
 end
+
+return AsnycTaskMultiSequence

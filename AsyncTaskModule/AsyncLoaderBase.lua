@@ -1,6 +1,7 @@
 --加载策略基类
 local AsyncTaskMultiBase = Class({})
-local AssetManage = Assets.req("AsyncTaskModule.AsyncManage")
+local AsyncManage = Assets.req("AsyncTaskModule.AsyncManage")
+local logger = AsyncManage.logger
 
 
 function AsyncTaskMultiBase:ctor()
@@ -15,44 +16,45 @@ function AsyncTaskMultiBase:SetParam(taskList)
     self.bAllReady = true
 end
 
---加载某个对象
+--加载某个对象，子类重写
 function AsyncTaskMultiBase:LoadTaskList()
     --需要打开遮罩,禁止操作
 end
 
---Task加载成功
+--Task加载成功,子类重写
 function AsyncTaskMultiBase:onTaskFinish(task)
+    logger:process("AsyncTaskMultiBase:onTaskFinish", task.key)
 end
 
---Task加载失败
+--Task加载失败，子类重写
 function AsyncTaskMultiBase:onTaskError(task)
+    logger:error("AsyncTaskMultiBase:onTaskError", task.key)
 end
 
 
 --所有Task加载结束
 function AsyncTaskMultiBase:onAllTaskFinish()
+    logger:process("AsyncTaskMultiBase:onAllTaskFinish")
     self.bAllReady = true
     if self.bIsRemove then
-        AssetManage:RemoveTaskMulti(self.key)
+        AsyncManage:RemoveTaskMulti(self.key)
         self.bIsRemove = false
     end
 end
 
+--从队列中取出某一个任务
 function AsyncTaskMultiBase:GetTaskFromListByIndex( index)
     return self.taskList[index]
 end
 
---单个ask过程结束触发的回调
-function AsyncTaskMultiBase:postTask()
-end
-
+--终止加载队列
 function AsyncTaskMultiBase:StopTaskMulti()
     local bAll = true
     for i=1, #self.taskList do
         bAll = bAll and self.taskList[i]:SuspendTask()
     end
     if bAll then
-        AssetManage:RemoveTaskMulti(self.key)
+        AsyncManage:RemoveTaskMulti(self.key)
     else
         self.bIsRemove = true
     end

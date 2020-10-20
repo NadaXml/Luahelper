@@ -1,10 +1,12 @@
 
 --并行加载
 local AsyncTaskMultiParallel = Class({}, Assets.req("AsyncTaskModule.AsyncLoaderBase"))
+local AsyncManage = Assets.req("AsyncTaskModule.AsyncManage")
+local logger = AsyncManage.logger
 
 --加载策略参数初始化
 function AsyncTaskMultiParallel:SetParam(taskList)
-    self.getSuper(self, AsyncTaskMultiParallel):SetParam(taskList)
+    self.getSuper(self, AsyncTaskMultiParallel).SetParam(self, taskList)
     --所有加载成功标志位
     self.maxBit = 0
     --当前记载进度标志位
@@ -19,6 +21,7 @@ end
 
 --单个Task加载成功
 function AsyncTaskMultiParallel:onTaskFinish(task)
+    self.getSuper(self, AsyncTaskMultiParallel).onTaskFinish(self, task)
     local bit = self.task2bit[task]
     self.curSuccess = self.curSuccess & bit
     self:postTask()
@@ -26,6 +29,7 @@ end
 
 --单个Task加载失败
 function AsyncTaskMultiParallel:onTaskError(task)
+    self.getSuper(self, AsyncTaskMultiParallel).onTaskFinish(self, task)
     local bit = self.task2bit[task]
     self.curError = self.curError & bit
     self:postTask()
@@ -34,13 +38,16 @@ end
 --并行加载Task列表
 function AsyncTaskMultiParallel:LoadTaskList()
     if self.taskList ~= nil then
-        local taskList = self.taskList
-        for i=1, #taskList do
-            local tsk = taskList[i]
-            self.task2bit[tsk] = 1 << (i-1)
-            tsk:SetMulti(self)
-            tsk:LoadTask()
-        end
+        logger:error("AsyncTaskMultiParallel:LoadTaskList:","list nil")
+        return
+    end
+
+    local taskList = self.taskList
+    for i=1, #taskList do
+        local tsk = taskList[i]
+        self.task2bit[tsk] = 1 << (i-1)
+        tsk:SetMulti(self)
+        tsk:LoadTask()
     end
 end
 
@@ -48,7 +55,7 @@ end
 function AsyncTaskMultiParallel:postTask()
     self.curBit = self.curSuccess | self.curError
     if self.curBit == self.maxBit then
-        self:onAllTaskFinish()
+        self.getSuper(self, AsyncTaskMultiParallel).onAllTaskFinish(self)
     end
 end
 

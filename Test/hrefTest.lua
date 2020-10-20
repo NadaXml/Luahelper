@@ -1,22 +1,9 @@
 
 
 --去除URL中的<修饰符>
-function convertURL(url)
-    
-    local bt = {}
-    bt.i = true
-    bt.b = true
-    bt.color = true
+function convertURL(str)
 
-    local rt = string.gsub(url, "</?(%a+)=?#?%w->", function(a)
-        print(a)
-        if bt[a] then
-            return ""
-        end
-    end)
-
-    print(rt)
-    return rt
+    return string.gsub(str, "<[color|b|size|i|material|quad|/color|/b|/size|/i|/material|/quad][^>]*>", "")
 
     --[[
     local bt = {}
@@ -41,7 +28,6 @@ function convertURL(url)
 
             if bt[tmp] then
                 table.insert(stack, tmp)
-                
                 realStrs1 = e1
             end
         else
@@ -70,7 +56,6 @@ function convertURL(url)
             else
                 break
             end
-        
         end
     until( #stack == 0)
 
@@ -81,29 +66,25 @@ function convertURL(url)
         local temp = string.sub(url, realStrs1+1, realStre1)
         return temp
     end]]
-    
 end
 
---匹配出URL的文本
-function matchURL(ss)
-    local ret = string.gmatch(ss, "<a href=\"(.-)\"></a>")
-    local fdStr = nil
-    for m in ret do
-        print("m  "..m)
-        local url = convertURL(m)
-        print(" url  "..url)
-        fdStr = m
-        break
+--匹配出<a href=""></a>中的URL文本
+function matchURL(str)
+    local pattern1 = "<a href=\"(.-)\">.-</a>"
+    local pattern2 = "<a href=\".-\">(.-)</a>"
+    local findURL = nil
+    local retIter = string.gmatch(str, pattern1)
+    for m in retIter do
+        findURL = m
     end
-
-    if fdStr ~= nil then
-        return string.gsub(ss, "<a href=\"(.-)\"></a>", fdStr)
-    end
-
-    return ss
+    str = string.gsub(str, pattern2,
+        function(a)
+            return a
+        end)
+    return str, findURL
 end
 
 
-local b = "<a href=\"<color=#ffe760><i><b>www<day>.baidu.com</b></i></color>\"></a>"
+local b = "<a href=\"www<day>.baidu.com\"><color=#ffe760><i><b>www<day>.baidu.com</b></i></color></a>"
 
-matchURL(b)
+print(matchURL(b))

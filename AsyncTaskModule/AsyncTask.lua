@@ -1,6 +1,8 @@
 --单个异步加载任务
 local AsyncTask = Class({})
 local AsyncManage = Assets.req("AsyncTaskModule.AsyncManage")
+local logger = AsyncManage.logger
+
 
 AsyncTask.LType = {
     None = 0,
@@ -47,17 +49,30 @@ end
 
 --加载某个任务
 function AsyncTask:LoadTask()
-    AssetsMock:LoadAsync(self.path,
+    logger:process("AsyncTask:LoadTask", self.key)
+    Assets.loadAsync(self.path,
+    --finish
     function(asset)
-        self:TryNotifyFinish()
+        logger:process("AsyncTask:LoadTask:finish",self.key)
+        self:OnLoaded(asset)
     end,
+    --process
+    function (currentDonelen)
+        -- body
+        logger:process("AsyncTask:LoadTask:progress", self.key, currentDonelen)
+    end,
+    --error
     function()
+        logger:error("AsyncTask:LoadTask:error",self.key)
         self:OnError()
     end)
 end
 
 --加载完成逻辑
 function AsyncTask:OnLoaded(asset)
+
+    logger:process("AsyncTask:OnLoaded",self.key, self.asyncType)
+
     if self.asyncType == self.LType.Pending then
         self:SetLType(self.LType.Finish)
         self.result = asset
@@ -75,14 +90,13 @@ function AsyncTask:OnLoaded(asset)
         end
         self:TryNotifyError()
     end
-
 end
 
 --加载错误逻辑
 function AsyncTask:OnError()
+    logger:process("AsyncTask:OnError",self.key)
     self:SetLType(self.LType.Error)
     if self.err ~= nil then
-        print("Load error")
         self.err()
     end
 end
@@ -113,9 +127,9 @@ function AsyncTask:SuspendTask()
     end
 end
 
---回收加载成功的资源
+--回收加载成功的资源--子类必须准确实现，父类
 function AsyncTask:Recycle()
-    Destroy(asset)
+    logger:process("AsyncTask:Recycle",self.key)
 end
 
 return AsyncTask

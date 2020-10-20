@@ -3,24 +3,25 @@
 --也需要pool管理
 
 local AsyncManage = Class({})
-local AsyncTask = Asset.req("AsyncTaskModule.AsyncTask")
-local AsyncTaskLogger = Asset.req("AsyncTaskModule.AsyncTaskLogger")
+local AsyncTaskUI = Assets.req("AsyncTaskModule.AsyncTaskUI")
+local AsyncTaskLogger = Assets.req("AsyncTaskModule.AsyncTaskLogger")
 
-function AsyncManage:ctor()
+function AsyncManage:Init()
     self.allTaskMap = {}
     self.allTaskMultiMap = {}
-    self.logger = AsyncTaskLogger:new()
+    self.logger = AsyncTaskLogger.new()
 end
 
 --创建单个异步任务
-function AsyncManage:CreateTask(key, path, finish, err)
-    local at = AsyncTask:new(key, path, finish, err)
+function AsyncManage:CreateTaskUI(key, path, finish, err)
+    local at = AsyncTaskUI.new(key, path, finish, err)
     self.allTaskMap[key] = at
+    return at
 end
 
 --得到一个异步任务，多个任务用
-function AsyncManage:ObtainTask(path, finish, err)
-    local at = AsyncTask:new(nil, path, finish, err)
+function AsyncManage:ObtainTaskUI(path, finish, err)
+    local at = AsyncTaskUI.new(nil, path, finish, err)
     return at
 end
 

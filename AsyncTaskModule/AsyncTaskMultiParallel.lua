@@ -1,8 +1,6 @@
 
 --并行加载
 local AsyncTaskMultiParallel = Class({}, Assets.req("AsyncTaskModule.AsyncLoaderBase"))
-local AsyncManage = Assets.req("AsyncTaskModule.AsyncManage")
-local logger = AsyncManage.logger
 
 --加载策略参数初始化
 function AsyncTaskMultiParallel:SetParam(taskList)
@@ -38,7 +36,7 @@ end
 --并行加载Task列表
 function AsyncTaskMultiParallel:LoadTaskList()
     if self.taskList ~= nil then
-        logger:error("AsyncTaskMultiParallel:LoadTaskList:","list nil")
+        App.asyncLogger:error("AsyncTaskMultiParallel:LoadTaskList:","list nil")
         return
     end
 

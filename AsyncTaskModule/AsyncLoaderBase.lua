@@ -1,8 +1,5 @@
 --加载策略基类
 local AsyncTaskMultiBase = Class({})
-local AsyncManage = Assets.req("AsyncTaskModule.AsyncManage")
-local logger = AsyncManage.logger
-
 
 function AsyncTaskMultiBase:ctor()
 end
@@ -23,21 +20,21 @@ end
 
 --Task加载成功,子类重写
 function AsyncTaskMultiBase:onTaskFinish(task)
-    logger:process("AsyncTaskMultiBase:onTaskFinish", task.key)
+    App.asyncLogger:process("AsyncTaskMultiBase:onTaskFinish", task.key)
 end
 
 --Task加载失败，子类重写
 function AsyncTaskMultiBase:onTaskError(task)
-    logger:error("AsyncTaskMultiBase:onTaskError", task.key)
+    App.asyncLogger:error("AsyncTaskMultiBase:onTaskError", task.key)
 end
 
 
 --所有Task加载结束
 function AsyncTaskMultiBase:onAllTaskFinish()
-    logger:process("AsyncTaskMultiBase:onAllTaskFinish")
+    App.asyncLogger:process("AsyncTaskMultiBase:onAllTaskFinish")
     self.bAllReady = true
     if self.bIsRemove then
-        AsyncManage:RemoveTaskMulti(self.key)
+        App.async:RemoveTaskMulti(self.key)
         self.bIsRemove = false
     end
 end
@@ -54,7 +51,7 @@ function AsyncTaskMultiBase:StopTaskMulti()
         bAll = bAll and self.taskList[i]:SuspendTask()
     end
     if bAll then
-        AsyncManage:RemoveTaskMulti(self.key)
+        App.async:RemoveTaskMulti(self.key)
     else
         self.bIsRemove = true
     end

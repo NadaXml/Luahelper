@@ -9,6 +9,7 @@ function AsyncTaskUI:Recycle()
     local result = self.getSuper(self, AsyncTaskUI).GetResult(self)
     if result ~= nil then
         result:destroy()
+        self.result = nil
     end
 end
 

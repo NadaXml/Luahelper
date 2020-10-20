@@ -1,8 +1,5 @@
 --单个异步加载任务
 local AsyncTask = Class({})
-local AsyncManage = Assets.req("AsyncTaskModule.AsyncManage")
-local logger = AsyncManage.logger
-
 
 AsyncTask.LType = {
     None = 0,
@@ -33,6 +30,7 @@ end
 
 --通知Loader,单个任务加载成功
 function AsyncTask:TryNotifyFinish()
+    App.asyncLogger:process("AsyncTask:TryNotifyFinish", self.key)
     local multi = self.multi
     if multi ~= nil then
         multi:onTaskFinish(self)
@@ -41,6 +39,7 @@ end
 
 --通知Loader，单个任务加载失败
 function AsyncTask:TryNotifyError()
+    App.asyncLogger:process("AsyncTask:TryNotifyError", self.key)
     local multi = self.multi
     if multi ~= nil then
         multi:onTaskError(self)
@@ -49,33 +48,28 @@ end
 
 --加载某个任务
 function AsyncTask:LoadTask()
-    logger:process("AsyncTask:LoadTask", self.key)
+    App.asyncLogger:process("AsyncTask:LoadTask", self.key)
+    self:SetLType(self.LType.Pending)
     Assets.loadAsync(self.path,
-    --finish
     function(asset)
-        logger:process("AsyncTask:LoadTask:finish",self.key)
+        App.asyncLogger:process("AsyncTask:LoadTask:finish", self.key)
         self:OnLoaded(asset)
     end,
-    --process
     function (currentDonelen)
-        -- body
-        logger:process("AsyncTask:LoadTask:progress", self.key, currentDonelen)
+        App.asyncLogger:process("AsyncTask:LoadTask:progress", self.key, currentDonelen)
     end,
-    --error
     function()
-        logger:error("AsyncTask:LoadTask:error",self.key)
+        App.asyncLogger:error("AsyncTask:LoadTask:error",self.key)
         self:OnError()
     end)
 end
 
 --加载完成逻辑
 function AsyncTask:OnLoaded(asset)
-
-    logger:process("AsyncTask:OnLoaded",self.key, self.asyncType)
-
+    App.asyncLogger:process("AsyncTask:OnLoaded",self.key, self.asyncType)
     if self.asyncType == self.LType.Pending then
         self:SetLType(self.LType.Finish)
-        self.result = asset
+        --self.result = asset
 
         if self.finish ~= nil then
             self.finish(asset)
@@ -86,7 +80,7 @@ function AsyncTask:OnLoaded(asset)
         --resutl可能直接Destory或者进入pool
         self:Recycle()
         if self.Multi == nil then
-            AsyncManage:RemoveTask(self.key)
+            App.async:RemoveTask(self.key)
         end
         self:TryNotifyError()
     end
@@ -94,7 +88,7 @@ end
 
 --加载错误逻辑
 function AsyncTask:OnError()
-    logger:process("AsyncTask:OnError",self.key)
+    App.asyncLogger:process("AsyncTask:OnError",self.key)
     self:SetLType(self.LType.Error)
     if self.err ~= nil then
         self.err()
@@ -129,7 +123,7 @@ end
 
 --回收加载成功的资源--子类必须准确实现，父类
 function AsyncTask:Recycle()
-    logger:process("AsyncTask:Recycle",self.key)
+    App.asyncLogger:process("AsyncTask:Recycle",self.key)
 end
 
 return AsyncTask

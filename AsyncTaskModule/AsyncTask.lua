@@ -72,7 +72,7 @@ function AsyncTask:OnLoaded(asset)
         --self.result = asset
 
         if self.finish ~= nil then
-            self.finish(asset)
+            self.finish(asset, self)
         end
         self:TryNotifyFinish()
     else
@@ -123,7 +123,45 @@ end
 
 --回收加载成功的资源--子类必须准确实现，父类
 function AsyncTask:Recycle()
+    self.postFuncList = nil
     App.asyncLogger:process("AsyncTask:Recycle",self.key)
+end
+
+--为了适应当前结构
+--UIBase打开有一个回调
+--UIManage打开有一个setOrder回调
+--增加一个加载成功回调列表，绑在Task上，方法加数据，不存闭包，不好管理
+--注意Table 内存的申请
+function AsyncTask:BindPostLoaded(caller, func, data)
+    local ll = self.postFuncList
+    if ll == nil then
+        ll = {}
+        self.postFuncList = ll
+    end
+    table.insert(ll, {
+        caller = caller,
+        func = func,
+        data = data
+    })
+end
+
+
+function AsyncTask:SetPostLoadedData(func, k , v)
+    local d = self.postFuncList
+    if d ~= nil then
+        local _, findRet = table.find(d, function(findK , findV)
+            return findK == func
+        end)
+
+        findRet.data[k] = v
+    end
+end
+
+function AsyncTask:doPostFinish()
+    for i, v in ipairs(self.postFuncList) do
+        v.func(v.caller, v.data)
+    end
+    self.postFuncList = {} 
 end
 
 return AsyncTask

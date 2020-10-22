@@ -10,12 +10,25 @@ function AsyncTaskMultiBase:SetParam(taskList)
     --加载被中断，需要在所有加载完成后，删除Multi对象
     self.bIsRemove = false
     --所有所有加载过程结束
-    self.bAllReady = true
+    self.bAllReady = false
+    --加载中
+    self.isLoading = false
+end
+
+--- AsyncTaskMultiBase.appendTask 添加某一个任务,未开始加载的时候才有效
+-- @param task 增加的AsyncTask
+function AsyncTaskMultiBase:appendTask(task)
+    if not self.isLoading then
+        table.insert(self.taskList, task)
+    else
+        App.asyncLogger:error("loading try append failed", task.key)
+    end
 end
 
 --加载某个对象，子类重写
 function AsyncTaskMultiBase:LoadTaskList()
     --需要打开遮罩,禁止操作
+    self.isLoading = true
 end
 
 --Task加载成功,子类重写
@@ -33,6 +46,7 @@ end
 function AsyncTaskMultiBase:onAllTaskFinish()
     App.asyncLogger:process("AsyncTaskMultiBase:onAllTaskFinish")
     self.bAllReady = true
+    self.isLoading = false
     if self.bIsRemove then
         App.async:RemoveTaskMulti(self.key)
         self.bIsRemove = false

@@ -64,6 +64,10 @@ function AsyncTask:LoadTask()
     end)
 end
 
+function AsyncTask:isPending()
+    return self.asyncType == self.LType.Pending
+end
+
 --加载完成逻辑
 function AsyncTask:OnLoaded(asset)
     App.asyncLogger:process("AsyncTask:OnLoaded",self.key, self.asyncType)
@@ -132,31 +136,46 @@ end
 --UIManage打开有一个setOrder回调
 --增加一个加载成功回调列表，绑在Task上，方法加数据，不存闭包，不好管理
 --注意Table 内存的申请
+--防止重复
 function AsyncTask:BindPostLoaded(caller, func, data)
-    local ll = self.postFuncList
-    if ll == nil then
-        ll = {}
-        self.postFuncList = ll
+    local tempList = self.postFuncList
+    if tempList == nil then
+        tempList = {}
+        self.postFuncList = tempList
     end
-    table.insert(ll, {
-        caller = caller,
-        func = func,
-        data = data
-    })
+
+    local _, findRet = table.find(tempList, function(findK , findV)
+        return findV.func == func
+    end)
+
+    if findRet ~= nil then
+        findRet.caller = caller
+        findRet.data = data
+    else
+        table.insert(tempList, {
+            caller = caller,
+            func = func,
+            data = data
+        })
+    end
+
+    
 end
 
-
+--设置
 function AsyncTask:SetPostLoadedData(func, k , v)
-    local d = self.postFuncList
-    if d ~= nil then
-        local _, findRet = table.find(d, function(findK , findV)
-            return findK == func
+    local tempList = self.postFuncList
+    if tempList ~= nil then
+        local _, findRet = table.find(tempList, function(findK , findV)
+            return findV.func == func
         end)
 
         findRet.data[k] = v
     end
 end
 
+--执行加载成功后的回调方法
+--需要保证有序执行
 function AsyncTask:doPostFinish()
     for i, v in ipairs(self.postFuncList) do
         v.func(v.caller, v.data)

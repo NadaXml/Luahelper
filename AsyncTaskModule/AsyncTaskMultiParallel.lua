@@ -35,6 +35,7 @@ end
 
 --并行加载Task列表
 function AsyncTaskMultiParallel:LoadTaskList()
+    self.super.LoadTaskList(self)
     if self.taskList ~= nil then
         App.asyncLogger:error("AsyncTaskMultiParallel:LoadTaskList:","list nil")
         return

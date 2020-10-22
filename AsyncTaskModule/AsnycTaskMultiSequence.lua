@@ -9,6 +9,7 @@ end
 
 --串行加载Task列表
 function AsnycTaskMultiSequence:LoadTaskList()
+    self.super.LoadTaskList(self)
     self.curor = 0
     self:NextTask()
 end

@@ -78,15 +78,20 @@ function AsyncTask:OnLoaded(asset)
         if self.finish ~= nil then
             self.finish(asset, self)
         end
+        self:tryRemoveMySelf()
         self:TryNotifyFinish()
     else
         --Task被外部终止，因为Asset接口一定有会回调
         --resutl可能直接Destory或者进入pool
         self:Recycle()
-        if self.Multi == nil then
-            App.async:RemoveTask(self.key)
-        end
+        self:tryRemoveMySelf()
         self:TryNotifyError()
+    end
+end
+
+function AsyncTask:tryRemoveMySelf()
+    if self.Multi == nil then
+        App.async:RemoveTask(self.key)
     end
 end
 
@@ -97,6 +102,8 @@ function AsyncTask:OnError()
     if self.err ~= nil then
         self.err()
     end
+    self:tryRemoveMySelf()
+    self:TryNotifyError()
 end
 
 --设置加载状态
@@ -116,6 +123,7 @@ end
 
 --放弃某个加载（包括加载中）
 function AsyncTask:SuspendTask()
+    App.asyncLogger:process("AsyncTask:SuspendTask",self.key)
     if self.asyncType == self.LType.Finish then
         self:Recycle()
         return true

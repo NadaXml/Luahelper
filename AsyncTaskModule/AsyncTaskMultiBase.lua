@@ -1,16 +1,13 @@
 --加载策略基类
-local AsyncTaskMultiBase = Class({})
 
-function AsyncTaskMultiBase:ctor()
+local AsyncTaskMultiBase = Class({})
+function AsyncTaskMultiBase:ctor(key)
+    self.key = key
 end
 
 --加载策略参数
 function AsyncTaskMultiBase:SetParam(taskList)
     self.taskList = taskList
-    --加载被中断，需要在所有加载完成后，删除Multi对象
-    self.bIsRemove = false
-    --所有所有加载过程结束
-    self.bAllReady = false
     --加载中
     self.isLoading = false
 end
@@ -26,9 +23,16 @@ function AsyncTaskMultiBase:appendTask(task)
 end
 
 --加载某个对象，子类重写
+--防止冲入
 function AsyncTaskMultiBase:LoadTaskList()
     --需要打开遮罩,禁止操作
-    self.isLoading = true
+    if not self.isLoading then 
+        self.isLoading = true
+        return false
+    else
+        App.asyncLogger:error("repeat load")
+        return true
+    end
 end
 
 --Task加载成功,子类重写
@@ -45,12 +49,9 @@ end
 --所有Task加载结束
 function AsyncTaskMultiBase:onAllTaskFinish()
     App.asyncLogger:process("AsyncTaskMultiBase:onAllTaskFinish")
-    self.bAllReady = true
     self.isLoading = false
-    if self.bIsRemove then
-        App.async:RemoveTaskMulti(self.key)
-        self.bIsRemove = false
-    end
+    --这个放基类时序，可能有问题，虚函数定义需要多几个
+    App.async:RemoveTaskMulti(self.key)
 end
 
 --从队列中取出某一个任务
@@ -67,7 +68,7 @@ function AsyncTaskMultiBase:StopTaskMulti()
     if bAll then
         App.async:RemoveTaskMulti(self.key)
     else
-        self.bIsRemove = true
+        --说明有任务，还在加载中
     end
 end
 

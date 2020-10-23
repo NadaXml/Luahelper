@@ -32,7 +32,7 @@ function AsyncManage:CreateTaskMultiSeq(key, ...)
     local atm = self.allTaskMultiMap[key]
     if atm == nil then
         local ll = {...}
-        local atm = AsnycTaskMultiSequence.new()
+        local atm = AsnycTaskMultiSequence.new(key)
         atm:SetParam(ll)
         self.allTaskMultiMap[key] = atm
         return atm
@@ -48,7 +48,7 @@ function AsyncManage:CreateTaskMultiparllel(key, ...)
     local atm = self.allTaskMultiMap[key]
     if atm == nil then
         local ll = {...}
-        local atm = AsyncTaskMultiParallel.new()
+        local atm = AsyncTaskMultiParallel.new(key)
         atm:SetParam(ll)
         self.allTaskMultiMap[key] = atm
         return atm

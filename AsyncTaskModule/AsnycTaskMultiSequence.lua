@@ -1,6 +1,6 @@
 
 --串行加载策略
-local AsnycTaskMultiSequence = Class({}, Assets.req("AsyncTaskModule.AsyncLoaderBase"))
+local AsnycTaskMultiSequence = Class({}, Assets.req("AsyncTaskModule.AsyncTaskMultiBase"))
 
 function AsnycTaskMultiSequence:SetParam(taskList)
     self.getSuper(self, AsnycTaskMultiSequence).SetParam(self, taskList)
@@ -9,14 +9,16 @@ end
 
 --串行加载Task列表
 function AsnycTaskMultiSequence:LoadTaskList()
-    self.super.LoadTaskList(self)
+    if self.super.LoadTaskList(self) then
+        return 
+    end
     self.curor = 0
     self:NextTask()
 end
 
 --执行下一个加载任务
 function AsnycTaskMultiSequence:NextTask()
-    if self.taskList ~= nil then
+    if self.taskList == nil then
         App.asyncLogger:error("AsyncTaskMultiParallel:LoadTaskList:","list nil")
         return
     end

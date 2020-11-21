@@ -36,7 +36,7 @@ public class RecycleGrid : MonoBehaviour
         public GameObject item;
     }
 
-    //视口中所有行的信息
+    //所有行的信息
     public List<LineData> lineDataList = new List<LineData>();
 
     public void datasource()
@@ -48,14 +48,6 @@ public class RecycleGrid : MonoBehaviour
     {
         mmap[1] = proxyTemplate1;
         mmap[2] = proxyTemplate2;
-    }
-
-    public void scrollDelta(float yDelta)
-    {
-        if (yDelta > 0 )
-        {
-
-        }
     }
 
     public void resetData()
@@ -75,6 +67,47 @@ public class RecycleGrid : MonoBehaviour
         public int endIndex;
         public LineY childLineY;
         public List<ShowCellData> list = new List<ShowCellData>();
+
+        public float posx = 0;
+
+        public bool inLine(int index)
+        {
+            return beginIndex <= index && endIndex >= index;
+        }
+
+        public bool isInView(float virtualPos, float viewHeight)
+        {
+            float delta = childLineY.posy - virtualPos;
+            return delta + lineHeight > 0 && delta < viewHeight;
+        }
+
+        public ShowCellData obtainShowCellData(float x, LineY ld, int itemType)
+        {
+            ShowCellData scd = new ShowCellData();
+            scd.posX = x;
+            scd.ld = ld;
+            scd.nType = itemType;
+            return scd;
+        }
+        public bool AddCell(RectTransform rect, int index, float viewWidth, ref float lineHeightDelta)
+        {
+            float ft = posx + rect.rect.width;
+            if ( ft > viewWidth)
+            {
+                return false;
+            }
+            else
+            {
+                posx = ft;
+                ShowCellData scd = obtainShowCellData(posx- rect.rect.width, childLineY, 1);
+                float heightDelta = Mathf.Max(0, rect.rect.height - lineHeight);
+                lineHeightDelta = Mathf.Max(lineHeight, rect.rect.height);
+                endIndex = index;
+                list.Add(scd);
+                return true;
+            }
+        }
+        
     }
 
     public LineData obtainLineData(int beginIndex, float lineHeight, float childPosy)
@@ -87,110 +120,221 @@ public class RecycleGrid : MonoBehaviour
         return ld;
     }
 
-    public void setViewIndex(int tarIndex)
+    //视口的高度
+    public float ViewHeight
     {
-        recycleOldItem();
-        //y向计算
-        //视口的大小
-        float viewWidth = viewport.rect.width;
-        float viewHeight = -viewport.rect.height;
-        //计算中间值
-        float deltaX = 0;
-        float deltaY = 0;
-        //换行
-        bool yPlus = false; 
-        //找到Item的位置
-        bool findItem = false;
-
-        for (int i= 0; i < proxy.Count; i++)
+        get
         {
-            if (tarIndex == i )
-            {
-                //找到合适的Item，向下继续填满viewport;
-                //向下未填满，目前是留出空白
-                //继续向下填充，到结束，可以提早结束
-                findItem = true;
-            }
+            return viewport.rect.height;
+        }
+    }
+    //视口的宽度
+    public float ViewWidth
+    {
+        get
+        {
+            return viewport.rect.width;
+        }
+    }
+    //当前滑动的位置
+    public float virtualPos = 0;
+    public int allBeginLine;
+    public int allEndLine;
 
+    public void initData()
+    {
+        lineDataList.Clear();
+        float tempPosY = 0;
+        for (int i = 0; i < proxy.Count; i++)
+        {
             RectTransform rect = proxy[i].GetComponent<RectTransform>();
-            //增加X的长度
-            deltaX += rect.rect.width;
+            LineData ld = GetLine(tempPosY, i, rect.rect.height);
+            float heightDelta = 0;
+            bool addSucess = ld.AddCell(rect, i, ViewWidth, ref heightDelta);
+            if (!addSucess)
+            {
+                //滑动位置
+                tempPosY = tempPosY + ld.lineHeight;
 
-            LineData ld;
-            LineData newLine;
-            if (lineDataList.Count == 0)
-            {
-                ld = obtainLineData(i, rect.rect.height, deltaY);
-                lineDataList.Add(ld);
-            }
-            else
-            {
-                ld = lineDataList[lineDataList.Count - 1];
-            }
+                //新增一行
+                ld = NewLine(tempPosY, i, rect.rect.height);
 
-            //超过宽度，换行，收下宽度
-            if ( deltaX > viewWidth )
-            {
-                deltaX -= rect.rect.width;
-                yPlus = true;
-            }
-
-            //换行
-            if (yPlus)
-            {
-                deltaY -= rect.rect.height;
-                deltaX = rect.rect.width;
-
-                ld = obtainLineData(i, rect.rect.height, deltaY);
-                lineDataList.Add(ld);
-                yPlus = false;
-            }
-            else
-            {
-                //计算当前行高度高度
-                ld.lineHeight = Mathf.Max(ld.lineHeight, rect.rect.height);
-            }
-
-            //超过下方视口
-            if ( deltaY < viewHeight )
-            {
-                //第一行移动，只有一行,直接结束
-                if (lineDataList.Count == 1)
+                addSucess = ld.AddCell(rect, i, ViewWidth, ref heightDelta);
+                if (!addSucess)
                 {
+                    Debug.LogError("Item的大小不合适窗口的大小");
                     break;
                 }
                 else
                 {
-                    //找到Item之后，绘制到视口结束
-                    if (findItem)
-                    {
-                        lineDataList.RemoveAt(lineDataList.Count-1);
-                        break;
-                    }
-                    else
-                    {
-                        //未找到，需要将上方列表一处，下方列表补上
-                        LineData toremove = lineDataList[0];
-                        deltaY += toremove.lineHeight;
-                        lineDataList.RemoveAt(0);
-                        stepLineData(toremove.lineHeight, lineDataList);
-                    }
+                    lineDataList.Add(ld);
                 }
             }
-            //生成某个Cell
-            float showDataX = deltaX - rect.rect.width;
-            int itemType = 1;
-            if (i == 1)
+        }
+    }
+
+    public void OnScorll(float x, float y)
+    {
+        virtualPos = virtualPos + y;
+        content.anchoredPosition = new Vector2(content.anchoredPosition.x, content.anchoredPosition.y + y );
+        int lastInVisiable = -1;
+        for (int i = allBeginLine; i <= allEndLine; i++)
+        {
+            if ( lineDataList[i].isInView(virtualPos, ViewHeight))
             {
-                itemType = 2;
+                lastInVisiable = i;
+                break;
             }
             else
             {
-                itemType = 1;
+                foreach (var s in lineDataList[i].list)
+                {
+                    if (s.item != null)
+                    {
+                        recycleItem(s.nType, s.item);
+                    }
+                }
             }
-            ShowCellData scd = obtainShowCellData(showDataX, ld.childLineY, itemType);
-            ld.list.Add(scd);
         }
+        //全部不可见,从allEnLine开始找可见到不可见
+        if (lastInVisiable == -1)
+        {
+            bool firstVisiable = false;
+            for (int i = allEndLine+1; i < lineDataList.Count; i++)
+            {
+                if (!lineDataList[i].isInView(virtualPos, ViewHeight))
+                {
+                    if (firstVisiable)
+                    {
+                        allEndLine = i-1;
+                        break;
+                    }
+                }
+                else
+                {
+                    allBeginLine = i;
+                    firstVisiable = true;
+                }
+            }
+        }
+        else
+        {
+            int tempBegin = -1;
+            //有可见
+            if (lastInVisiable == -1)
+            {
+                tempBegin = allEndLine+1;
+            }
+            else
+            {
+                allBeginLine = lastInVisiable;
+                tempBegin = allBeginLine + 1;
+            }
+            
+            for(int i = tempBegin; i < lineDataList.Count; i++)
+            {
+                if( !lineDataList[i].isInView(virtualPos, ViewHeight))
+                {
+                    allEndLine = i-1;
+                    break;
+                }
+            }
+        }
+        
+    }
+
+    public void setViewIndex(int index)
+    {
+        int findLine = -1;
+        int beginLine = -1;
+        int endLine = -1;
+        for (int i = 0; i < lineDataList.Count; i++)
+        {
+            LineData tempData = lineDataList[i];
+            if (tempData.inLine(index))
+            {
+                if (i == 0)
+                {
+                    findLine = 0;
+                    virtualPos = 0;
+                }
+                else
+                {
+                    if ( tempData.childLineY.posy - (ViewHeight - tempData.lineHeight) < 0 )
+                    {
+                        findLine = 0;
+                        virtualPos = 0;
+                    }
+                    else
+                    {
+                        findLine = i;
+                    }
+                }
+                break;
+            }
+        }
+
+        //第一行，查找下方
+        if (findLine == 0)
+        {
+            beginLine = findLine;
+            endLine = lineDataList.Count;
+            for (int i = 0; i < lineDataList.Count; i++)
+            {
+                if ( !lineDataList[i].isInView(virtualPos, ViewHeight) )
+                {
+                    endLine = i-1;
+                    break;
+                }
+            }
+        }
+        else
+        //向上查找行，上方不够，再显示下方
+        {
+            beginLine = 0;
+            endLine = findLine;
+            for (int i = findLine - 1; i > 0; i--)
+            {
+                if ( !lineDataList[i].isInView(virtualPos, ViewHeight) )
+                {
+                    beginLine = i;
+                    break;
+                }                
+            }
+        }
+
+        if (beginLine != -1 && endLine != - 1)
+        {
+            allBeginLine = beginLine;
+            allEndLine = endLine;
+            Debug.Log("print find "+ beginLine + "  " + endLine);
+        }
+
+    }
+
+    private LineData GetLine(float deltaY, int i, float originHeight)
+    {
+        //生成一行
+        LineData ld;
+        if (lineDataList.Count == 0)
+        {
+            ld = NewLine(deltaY, i, originHeight);
+            lineDataList.Add(ld);
+        }
+        else
+        {
+            ld = lineDataList[lineDataList.Count - 1];
+        }
+
+        return ld;
+    }
+
+    private LineData NewLine(float deltaY, int i, float originHeight)
+    {
+        //生成一行
+        LineData ld; 
+        ld = obtainLineData(i, originHeight, deltaY);
+        return ld;
     }
 
     private void stepLineData(float dStep, List<LineData> lineHeight)
@@ -202,41 +346,21 @@ public class RecycleGrid : MonoBehaviour
         }
     }
 
-    public ShowCellData obtainShowCellData(float x, LineY ld, int itemType)
-    {
-        ShowCellData scd = new ShowCellData();
-        scd.posX = x;
-        scd.ld = ld;
-        scd.nType = itemType;
-        return scd;
-    }
-
-    public void recycleOldItem()
-    {
-        for (int i = 0; i< lineDataList.Count; i++)
-        {
-            var lineData = lineDataList[i];
-            for (int j = 0; j < lineData.list.Count; j++)
-            {
-                var showdata = lineData.list[j];
-                recycleItem(showdata.nType, showdata.item);
-            }
-        }
-        lineDataList.Clear();
-
-    }
-
     public void drawView()
     {
-        for (int i = 0; i < lineDataList.Count; i++)
+        content.anchoredPosition = new Vector2(content.anchoredPosition.x, virtualPos);
+        for (int i = allBeginLine; i <= allEndLine; i++)
         {
             var lineData = lineDataList[i];
             for (int j = 0; j < lineData.list.Count; j++)
             {
                 var scd = lineData.list[j];
-                GameObject set = findItem(scd.nType);
-                scd.item = set;
-                Vector2 v2 = new Vector2(scd.posX, scd.ld.posy);
+                if (scd.item == null )
+                {
+                    scd.item = findItem(scd.nType);
+                }
+                GameObject set = scd.item;
+                Vector2 v2 = new Vector2(scd.posX, -scd.ld.posy);
                 set.transform.SetParent(content);
                 set.SetActive(true);
                 set.GetComponent<RectTransform>().anchoredPosition = v2;

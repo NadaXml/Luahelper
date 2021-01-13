@@ -21,18 +21,18 @@ public class GridDataLocator
     public void TestMock()
     {
         source = new List<GridDataSource>();
-        GridDataSource lambda()
+        GridDataSource lambda(int templateId)
         {
             GridDataSource gd = new GridDataSource();
             gd.Width = 110;
             gd.Height = 110;
-            gd.templateId = 1;
+            gd.templateId = templateId;
             return gd;
         }
         GridDataSource tempGd;
         for (int i = 0; i < 20; i++)
         {
-            tempGd = lambda();
+            tempGd = lambda(i%2);
             source.Add(tempGd);
         }
     }
@@ -163,7 +163,7 @@ public class LineData
         else
         {
             posx = ft;
-            ShowCellData scd = obtainShowCellData(posx - rect.Width, childLineY, 1);
+            ShowCellData scd = obtainShowCellData(posx - rect.Width, childLineY, rect.templateId);
             float heightDelta = Mathf.Max(0, rect.Height - lineHeight);
             lineHeightDelta = Mathf.Max(lineHeight, rect.Height);
             endIndex = index;
@@ -239,6 +239,16 @@ public class RecycleGrid : MonoBehaviour
     public int allBeginLine;
     public int allEndLine;
 
+
+    public void Awake()
+    {
+        initData();
+        setViewIndex(Convert.ToInt32(1));
+        drawView();
+
+        scrollRect.onValueChanged.AddListener(OnScorll);
+    }
+
     /// <summary>
     /// 初始化所有cell数据
     /// </summary>
@@ -275,23 +285,40 @@ public class RecycleGrid : MonoBehaviour
                 }
             }
         }
+        LineData last = lineDataList[lineDataList.Count - 1];
+        content.sizeDelta = new Vector2(content.sizeDelta.x, last.childLineY.posy + last.lineHeight);
     }
+
     /// <summary>
     /// 列表发生滑动
     /// </summary>
     /// <param name="x"></param>
     /// <param name="y"></param>
-    public void OnScorll(float x, float y)
+    public void OnScorll(Vector2 v2)
     {
-        virtualPos = virtualPos + y;
-        content.anchoredPosition = new Vector2(content.anchoredPosition.x, content.anchoredPosition.y + y );
-        int lastInVisiable = -1;
+        int lastBegin = allBeginLine;
+        int lastEnd = allEndLine;
+        int visiableBegin = -1;
+        int visiableEnd = -1;
+
+        bool upTodown = false;
+        upTodown = content.anchoredPosition.y > virtualPos;
+        
+        //true 向上划
+        //false 向下划
+        virtualPos = content.anchoredPosition.y;
         for (int i = allBeginLine; i <= allEndLine; i++)
         {
             if ( lineDataList[i].isInView(virtualPos, ViewHeight))
             {
-                lastInVisiable = i;
-                break;
+                if (visiableBegin == -1 )
+                {
+                    visiableBegin = i;
+                }
+                else
+                {
+                    visiableEnd = i;
+                }   
             }
             else
             {
@@ -305,51 +332,73 @@ public class RecycleGrid : MonoBehaviour
                 }
             }
         }
-        //全部不可见,从allEnLine开始找可见到不可见
-        if (lastInVisiable == -1)
+
+        Debug.Log("  upTodown  " + upTodown);
+        //向上划
+        if (upTodown)
         {
-            bool firstVisiable = false;
-            for (int i = allEndLine+1; i < lineDataList.Count; i++)
+            int temp = 0;
+            bool hasVisiable = visiableEnd != -1;
+            if (hasVisiable)
             {
-                if (!lineDataList[i].isInView(virtualPos, ViewHeight))
+                allBeginLine = visiableBegin;
+                temp = visiableEnd;
+            }
+            else
+            {
+                temp = allEndLine;
+            }
+            for (int i = temp + 1; i < lineDataList.Count; i++)
+            {
+                if (lineDataList[i].isInView(virtualPos, ViewHeight))
                 {
-                    if (firstVisiable)
+                    if (!hasVisiable)
                     {
-                        allEndLine = i-1;
-                        break;
+                        allBeginLine = i;
+                    }
+                }
+                else
+                {
+                    allEndLine = i;
+                    break;
+                }
+            }
+        }
+        //向下划
+        else
+        {
+            int temp = 0;
+            bool hasVisiable = visiableBegin != -1;
+            if (hasVisiable)
+            {
+                allEndLine = visiableEnd;
+                temp = visiableBegin;
+            }
+            else
+            {
+                temp = allBeginLine;
+            }
+            for (int i = temp - 1; i >= 0; i--)
+            {
+                if (lineDataList[i].isInView(virtualPos, ViewHeight))
+                {
+                    if (!hasVisiable)
+                    {
+                        allEndLine = i;
                     }
                 }
                 else
                 {
                     allBeginLine = i;
-                    firstVisiable = true;
-                }
-            }
-        }
-        else
-        {
-            int tempBegin = -1;
-            //有可见
-            if (lastInVisiable == -1)
-            {
-                tempBegin = allEndLine+1;
-            }
-            else
-            {
-                allBeginLine = lastInVisiable;
-                tempBegin = allBeginLine + 1;
-            }
-            
-            for(int i = tempBegin; i < lineDataList.Count; i++)
-            {
-                if( !lineDataList[i].isInView(virtualPos, ViewHeight))
-                {
-                    allEndLine = i-1;
                     break;
                 }
             }
         }
-        
+        if (lastEnd != allEndLine || lastBegin != allBeginLine)
+        {
+            Debug.Log(allBeginLine + " " + allEndLine);
+            drawView();
+        }
     }
 
     /// <summary>
@@ -466,7 +515,6 @@ public class RecycleGrid : MonoBehaviour
     /// </summary>
     public void drawView()
     {
-        content.anchoredPosition = new Vector2(content.anchoredPosition.x, virtualPos);
         for (int i = allBeginLine; i <= allEndLine; i++)
         {
             var lineData = lineDataList[i];

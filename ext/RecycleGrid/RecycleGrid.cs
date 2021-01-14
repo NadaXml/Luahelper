@@ -58,7 +58,7 @@ public class LineData
     {
         //节点的x位置
         public float posX;
-        //节点的高度ld
+        //节点的y位置（上方对齐）
         public LineY ld;
         //节点的显示模板类型
         public int nType;
@@ -203,13 +203,10 @@ public class RecycleGrid : MonoBehaviour
         public float left;
         public float right;
     }
-
     //所有行的信息
     public List<LineData> lineDataList = new List<LineData>();
-
     //数据源
     public GridDataLocator dataLocator = new GridDataLocator();
-
     //Cell模板
     public ItemTemplate itemTemplate;
 
@@ -239,13 +236,11 @@ public class RecycleGrid : MonoBehaviour
     public int allBeginLine;
     public int allEndLine;
 
-
     public void Awake()
     {
         initData();
         setViewIndex(Convert.ToInt32(1));
         drawView();
-
         scrollRect.onValueChanged.AddListener(OnScorll);
     }
 
@@ -285,6 +280,7 @@ public class RecycleGrid : MonoBehaviour
                 }
             }
         }
+        //控制content的长度
         LineData last = lineDataList[lineDataList.Count - 1];
         content.sizeDelta = new Vector2(content.sizeDelta.x, last.childLineY.posy + last.lineHeight);
     }
@@ -298,106 +294,122 @@ public class RecycleGrid : MonoBehaviour
     {
         int lastBegin = allBeginLine;
         int lastEnd = allEndLine;
-        int visiableBegin = -1;
-        int visiableEnd = -1;
-
+        //设置当前滑动的位置
+        virtualPos = content.anchoredPosition.y;
+        checkCurrentVisiable(ref allBeginLine, ref allEndLine);
         bool upTodown = false;
-        upTodown = content.anchoredPosition.y > virtualPos;
-        
         //true 向上划
         //false 向下划
-        virtualPos = content.anchoredPosition.y;
-        for (int i = allBeginLine; i <= allEndLine; i++)
-        {
-            if ( lineDataList[i].isInView(virtualPos, ViewHeight))
-            {
-                if (visiableBegin == -1 )
-                {
-                    visiableBegin = i;
-                }
-                else
-                {
-                    visiableEnd = i;
-                }   
-            }
-            else
-            {
-                foreach (var s in lineDataList[i].list)
-                {
-                    if (s.item != null)
-                    {
-                        itemTemplate.recycleItem(s.nType, s.item);
-                        s.item = null;
-                    }
-                }
-            }
-        }
-
-        Debug.Log("  upTodown  " + upTodown);
+        upTodown = content.anchoredPosition.y > virtualPos;
         //向上划
         if (upTodown)
         {
-            int temp = 0;
-            bool hasVisiable = visiableEnd != -1;
-            if (hasVisiable)
-            {
-                allBeginLine = visiableBegin;
-                temp = visiableEnd;
-            }
-            else
-            {
-                temp = allEndLine;
-            }
-            for (int i = temp + 1; i < lineDataList.Count; i++)
-            {
-                if (lineDataList[i].isInView(virtualPos, ViewHeight))
-                {
-                    if (!hasVisiable)
-                    {
-                        allBeginLine = i;
-                    }
-                }
-                else
-                {
-                    allEndLine = i;
-                    break;
-                }
-            }
+            bool onylEnd = allEndLine != -1
+            int tempIndex = onylEnd ? allEndLine : lastEnd;
+            fillToBottom(tempIndex, onylEnd, ref allBeginLine, ref allEndLine);
         }
         //向下划
         else
         {
-            int temp = 0;
-            bool hasVisiable = visiableBegin != -1;
-            if (hasVisiable)
-            {
-                allEndLine = visiableEnd;
-                temp = visiableBegin;
-            }
-            else
-            {
-                temp = allBeginLine;
-            }
-            for (int i = temp - 1; i >= 0; i--)
-            {
-                if (lineDataList[i].isInView(virtualPos, ViewHeight))
-                {
-                    if (!hasVisiable)
-                    {
-                        allEndLine = i;
-                    }
-                }
-                else
-                {
-                    allBeginLine = i;
-                    break;
-                }
-            }
+            bool onylEnd = allBeginLine != -1
+            int tempIndex = onylEnd ? allBeginLine : lastBegin;
+            fillToTop(tempIndex, onylEnd, ref allBeginLine, allEndLine);
         }
         if (lastEnd != allEndLine || lastBegin != allBeginLine)
         {
             Debug.Log(allBeginLine + " " + allEndLine);
             drawView();
+        }
+    }
+
+    public int fillToBottom(int searchIndex, bool onlyEnd, ref int outBegin, ref int outEnd)
+    {
+        outEnd = lineDataList.Count - 1;
+        bool flag = true;
+        for (int i = searchIndex + 1; i < lineDataList.Count; i++)
+        {
+            if (lineDataList[i].isInView(virtualPos, ViewHeight))
+            {
+                if (!onlyEnd && flag)
+                {
+                    outBegin = i;
+                    flag = false;
+                } 
+            }
+            else
+            {
+                if ( onlyEnd )
+                {
+                    outEnd = i - 1;
+                }
+                break;
+            }
+        }
+    }
+
+    public int fillToTop(int searchIndex, bool onlyEnd, ref int outBegin, ref int outEnd)
+    {
+        outBegin = 0;
+        bool flag = true;
+        for (int i = searchIndex - 1; i >= 0; i--)
+        {
+            if (lineDataList[i].isInView(virtualPos, ViewHeight))
+            {
+                if (!onlyEnd && flag)
+                {
+                    outEnd = i;
+                    flag = false;
+                }
+            }
+            else
+            {
+                if ( onlyEnd )
+                {
+                    outBegin = i + 1;
+                }
+                break;
+            }
+        }
+    }
+
+    //检查当前显示区域的合法性
+    public void checkCurrentVisiable(ref int beginIndex, ref int endIndex)
+    {
+        int tempBegin = beginIndex;
+        int tempEnd = endIndex;
+        beginIndex = -1;
+        endIndex = -1;
+        bool flag = false;
+        for (int i = tempBegin; i <= tempEnd; i++)
+        {
+            if (lineDataList[i].isInView(virtualPos, ViewHeight))
+            {
+                if (flag)
+                {
+                    beginIndex = i;
+                    flag = true;
+                }
+                else
+                {
+                    endIndex = i;
+                }   
+            }
+            else
+            {
+                recycleLine(lineDataList[i]);
+            }
+        }
+    }
+
+    public void recycleLine(lineData)
+    {
+        foreach (var s in lineData.list)
+        {
+            if (s.item != null)
+            {
+                itemTemplate.recycleItem(s.nType, s.item);
+                s.item = null;
+            }
         }
     }
 
@@ -409,14 +421,7 @@ public class RecycleGrid : MonoBehaviour
     {
         for (int i = allBeginLine; i <= allEndLine; i++)
         {
-            foreach(var cell in lineDataList[i].list)
-            {
-                if ( cell.item != null )
-                {
-                    itemTemplate.recycleItem(cell.nType, cell.item);
-                    cell.item = null;
-                }
-            }
+            recycleLine(lineDataList[i]);
         }
 
         int findLine = -1;

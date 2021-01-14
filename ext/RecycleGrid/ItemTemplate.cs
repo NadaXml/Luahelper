@@ -4,10 +4,16 @@ using System.Collections.Generic;
 using UnityEngine;
 
 
-//CellÑùÊ½Ä£°å
+//Cellï¿½ï¿½Ê½Ä£ï¿½ï¿½
 public class ItemTemplate : MonoBehaviour
 {
-    //itemÄ£°å
+    public enum sType
+    {
+        t = 1,
+        eidtor = 2
+    }  
+    public sType templateType = sType.eidtor;
+    //itemÄ£ï¿½ï¿½
     public List<GameObject> itemTemplate = new List<GameObject>();
 
     public GameObject GetItemTemplate(int nType)
@@ -31,7 +37,7 @@ public class ItemTemplate : MonoBehaviour
         poolMap.Clear();
     }
 
-    #region poolÏà¹Ø
+    #region poolï¿½ï¿½ï¿½
 
     /// <summary>
     /// pool
@@ -72,7 +78,36 @@ public class ItemTemplate : MonoBehaviour
 
     public GameObject createItem(int nType)
     {
-        return GameObject.Instantiate<GameObject>(itemTemplate[nType-1]);
+        if ( templateType == 1) 
+        {
+            return addPrefab_wllEidtor();
+        }       
+        else
+        {
+            return GameObject.Instantiate<GameObject>(itemTemplate[nType-1]);
+        }
+    }
+
+    public GameObject addPrefab_wllEidtor()
+    {
+        // åˆ›å»ºæ–°çš„
+        string path = "Assets/Lib/" + itemTempletePath + ".prefab";
+        GameObject load = UnityEditor.AssetDatabase.LoadMainAssetAtPath(path) as GameObject;
+        GameObject obj = UnityEditor.PrefabUtility.InstantiatePrefab(load) as GameObject;
+        obj.transform.SetParent(transform);
+        obj.transform.localScale = load.transform.localScale;
+        obj.transform.localPosition = load.transform.localPosition;
+        obj.transform.localRotation = load.transform.localRotation;
+        RectTransform objR = obj.GetComponent<RectTransform>();
+        if (objR != null)
+        {
+            RectTransform rect2 = load.GetComponent<RectTransform>();
+            objR.anchoredPosition = rect2.anchoredPosition;
+            objR.offsetMin = rect2.offsetMin;
+            objR.offsetMax = rect2.offsetMax;
+        }
+        LayoutRebuilder.ForceRebuildLayoutImmediate(objR);
+        return obj;
     }
 
     public void recycleItem(int nType, GameObject item)

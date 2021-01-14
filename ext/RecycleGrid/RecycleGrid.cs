@@ -449,39 +449,22 @@ public class RecycleGrid : MonoBehaviour
                         findLine = i;
                     }
                 }
+                virtualPos = tempData.childLineY.posy;
+                content.anchoredPosition = new Vector2(content.anchoredPosition.x, virtualPos);
                 break;
             }
         }
 
-        //第一行，查找下方
-        if (findLine == 0)
+        //如果剩余不够填满，直接拉到最低
+        if ( content.sizeDelta.y - virtualPos < viewHeight )
         {
-            beginLine = findLine;
-            endLine = lineDataList.Count;
-            for (int i = 0; i < lineDataList.Count; i++)
-            {
-                if ( !lineDataList[i].isInView(virtualPos, ViewHeight) )
-                {
-                    endLine = i-1;
-                    break;
-                }
-            }
+            //设置位置，向上查找
         }
         else
-        //向上查找行，上方不够，再显示下方
         {
-            beginLine = 0;
-            endLine = findLine;
-            for (int i = findLine - 1; i > 0; i--)
-            {
-                if ( !lineDataList[i].isInView(virtualPos, ViewHeight) )
-                {
-                    beginLine = i;
-                    break;
-                }                
-            }
+            fillToBottom()
         }
-
+        
         if (beginLine != -1 && endLine != - 1)
         {
             allBeginLine = beginLine;

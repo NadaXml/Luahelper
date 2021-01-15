@@ -2,9 +2,17 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
+[System.Serializable]
+public class WllTemplate
+{
+    public string path;
+    public float width;
+    public float height;
+}
 
-//Cell��ʽģ��
+//Cell模板
 public class ItemTemplate : MonoBehaviour
 {
     public enum sType
@@ -13,8 +21,20 @@ public class ItemTemplate : MonoBehaviour
         eidtor = 2
     }  
     public sType templateType = sType.eidtor;
-    //itemģ��
+    /// <summary>
+    /// 自测Item设置
+    /// </summary>
     public List<GameObject> itemTemplate = new List<GameObject>();
+
+    /// <summary>
+    /// wll子预制路径
+    /// </summary>
+    public List<WllTemplate> subItemTemplate = new List<WllTemplate>();
+
+    public WllTemplate GetWllItemTemplate(int nType)
+    {
+        return subItemTemplate[nType];
+    }
 
     public GameObject GetItemTemplate(int nType)
     {
@@ -37,7 +57,7 @@ public class ItemTemplate : MonoBehaviour
         poolMap.Clear();
     }
 
-    #region pool���
+    #region Item回收
 
     /// <summary>
     /// pool
@@ -78,9 +98,9 @@ public class ItemTemplate : MonoBehaviour
 
     public GameObject createItem(int nType)
     {
-        if ( templateType == 1) 
+        if ( templateType == sType.eidtor) 
         {
-            return addPrefab_wllEidtor();
+            return addPrefab_wllEidtor(nType);
         }       
         else
         {
@@ -88,8 +108,11 @@ public class ItemTemplate : MonoBehaviour
         }
     }
 
-    public GameObject addPrefab_wllEidtor()
+    public GameObject addPrefab_wllEidtor(int nType)
     {
+        WllTemplate wt = GetWllItemTemplate(nType);
+
+        string itemTempletePath = wt.path;
         // 创建新的
         string path = "Assets/Lib/" + itemTempletePath + ".prefab";
         GameObject load = UnityEditor.AssetDatabase.LoadMainAssetAtPath(path) as GameObject;

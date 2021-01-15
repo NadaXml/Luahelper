@@ -5,36 +5,23 @@ using UnityEngine;
 using UnityEngine.UI;
 
 //显示数据
+[System.Serializable]
 public class GridDataSource
 {
-    public float Width;
-    public float Height;
     public int templateId;
+    public WllTemplate wllt;
 }
 
 //数据绑定
+[System.Serializable]
 public class GridDataLocator
 {
     //所有数据
     public List<GridDataSource> source;
 
-    public void TestMock()
+    public void loadPrefab(List<GridDataSource> source)
     {
-        source = new List<GridDataSource>();
-        GridDataSource lambda(int templateId)
-        {
-            GridDataSource gd = new GridDataSource();
-            gd.Width = 110;
-            gd.Height = 110;
-            gd.templateId = templateId;
-            return gd;
-        }
-        GridDataSource tempGd;
-        for (int i = 0; i < 20; i++)
-        {
-            tempGd = lambda(i%2);
-            source.Add(tempGd);
-        }
+        this.source = source;
     }
 
     public List<GridDataSource> GetDataSource()
@@ -100,9 +87,9 @@ public class LineData
 
     //行高度
     public float lineHeight;
-    //行开始的索引
+    //行cell开始的索引
     public int beginIndex;
-    //行结束的索引
+    //行cell结束的索引
     public int endIndex;
     //行Y坐标
     public LineY childLineY;
@@ -153,9 +140,9 @@ public class LineData
     /// <param name="viewWidth"></param>
     /// <param name="lineHeightDelta"></param>
     /// <returns></returns>
-    public bool AddCell(GridDataSource rect, int index, float viewWidth, ref float lineHeightDelta)
+    public bool AddCell(GridDataSource source, int index, float viewWidth, ref float lineHeightDelta)
     {
-        float ft = posx + rect.Width;
+        float ft = posx + source.wllt.width;
         if (ft > viewWidth)
         {
             return false;
@@ -163,9 +150,8 @@ public class LineData
         else
         {
             posx = ft;
-            ShowCellData scd = obtainShowCellData(posx - rect.Width, childLineY, rect.templateId);
-            float heightDelta = Mathf.Max(0, rect.Height - lineHeight);
-            lineHeightDelta = Mathf.Max(lineHeight, rect.Height);
+            ShowCellData scd = obtainShowCellData(posx - source.wllt.width, childLineY, source.templateId);
+            lineHeightDelta = Mathf.Max(lineHeight, source.wllt.height);
             endIndex = index;
             list.Add(scd);
             return true;
@@ -236,11 +222,38 @@ public class RecycleGrid : MonoBehaviour
     public int allBeginLine;
     public int allEndLine;
 
+    private Vector2 tempSize = Vector2.zero;
+    public float ContentHeight
+    {
+        get
+        {
+            return content.sizeDelta.y;
+        }
+        set
+        {
+            tempSize.x = content.sizeDelta.x;
+            tempSize.y = value;
+            content.sizeDelta = tempSize;
+        }
+    }
+
+    private Vector2 tempAnchor = Vector2.zero;
+    public float ContentAnchorY
+    {
+        get
+        {
+            return content.anchoredPosition.y;
+        }
+        set
+        {
+            tempAnchor.x = content.anchoredPosition.x;
+            tempAnchor.y = value;
+            content.anchoredPosition = tempAnchor;
+        }
+    }
+
     public void Awake()
     {
-        initData();
-        setViewIndex(Convert.ToInt32(1));
-        drawView();
         scrollRect.onValueChanged.AddListener(OnScorll);
     }
 
@@ -249,15 +262,20 @@ public class RecycleGrid : MonoBehaviour
     /// </summary>
     public void initData()
     {
-        dataLocator.TestMock();
-
-        List<GridDataSource> source = dataLocator.source;
+        List<GridDataSource> source = dataLocator.GetDataSource();
+        
+        foreach( var temp in lineDataList)
+        {
+            recycleLine(temp);
+        }
         lineDataList.Clear();
         float tempPosY = 0;
         for (int i = 0; i < source.Count; i++)
         {
             GridDataSource data = source[i];
-            LineData ld = GetLine(tempPosY, i, data.Height);
+            data.wllt = itemTemplate.GetWllItemTemplate(data.templateId);
+            
+            LineData ld = GetLine(tempPosY, i, data.wllt.height);
             float heightDelta = 0;
             bool addSucess = ld.AddCell(data, i, ViewWidth, ref heightDelta);
             if (!addSucess)
@@ -266,7 +284,7 @@ public class RecycleGrid : MonoBehaviour
                 tempPosY = tempPosY + ld.lineHeight;
 
                 //新增一行
-                ld = LineData.NewLine(tempPosY, i, data.Height);
+                ld = LineData.NewLine(tempPosY, i, data.wllt.height);
 
                 addSucess = ld.AddCell(data, i, ViewWidth, ref heightDelta);
                 if (!addSucess)
@@ -282,7 +300,7 @@ public class RecycleGrid : MonoBehaviour
         }
         //控制content的长度
         LineData last = lineDataList[lineDataList.Count - 1];
-        content.sizeDelta = new Vector2(content.sizeDelta.x, last.childLineY.posy + last.lineHeight);
+        ContentHeight = last.childLineY.posy + last.lineHeight;
     }
 
     /// <summary>
@@ -294,26 +312,41 @@ public class RecycleGrid : MonoBehaviour
     {
         int lastBegin = allBeginLine;
         int lastEnd = allEndLine;
-        //设置当前滑动的位置
-        virtualPos = content.anchoredPosition.y;
-        checkCurrentVisiable(ref allBeginLine, ref allEndLine);
-        bool upTodown = false;
+        float tempContentY = ContentAnchorY;
         //true 向上划
         //false 向下划
-        upTodown = content.anchoredPosition.y > virtualPos;
+        bool upTodown = false;
+        upTodown = tempContentY > virtualPos;
+        //设置当前滑动的位置
+        virtualPos = tempContentY;
+        checkCurrentVisiable(ref allBeginLine, ref allEndLine);
         //向上划
         if (upTodown)
         {
-            bool onylEnd = allEndLine != -1
+            bool onylEnd = allEndLine != -1;
             int tempIndex = onylEnd ? allEndLine : lastEnd;
-            fillToBottom(tempIndex, onylEnd, ref allBeginLine, ref allEndLine);
+            if ( onylEnd )
+            {
+                fillToBottom_end(tempIndex, ref allEndLine);
+            }
+            else
+            {
+                fillToBottom_tr(tempIndex, ref allBeginLine, ref allEndLine);
+            }
         }
         //向下划
         else
         {
-            bool onylEnd = allBeginLine != -1
+            bool onylEnd = allBeginLine != -1;
             int tempIndex = onylEnd ? allBeginLine : lastBegin;
-            fillToTop(tempIndex, onylEnd, ref allBeginLine, allEndLine);
+            if ( onylEnd )
+            {
+                fillToTop_end(tempIndex, ref allBeginLine);
+            }
+            else
+            {
+                fillToTop_tr(tempIndex, ref allBeginLine, ref allEndLine);
+            }
         }
         if (lastEnd != allEndLine || lastBegin != allBeginLine)
         {
@@ -322,7 +355,22 @@ public class RecycleGrid : MonoBehaviour
         }
     }
 
-    public int fillToBottom(int searchIndex, bool onlyEnd, ref int outBegin, ref int outEnd)
+    //向下填充，找终点
+    public void fillToBottom_end(int searchIndex, ref int outEnd)
+    {
+        outEnd = lineDataList.Count - 1;
+        for (int i = searchIndex + 1; i < lineDataList.Count; i++)
+        {
+            if (!lineDataList[i].isInView(virtualPos, ViewHeight))
+            {
+                outEnd = i - 1;
+                break;
+            }
+        }
+    }
+
+    //向下填充，找起点和重点
+    public void fillToBottom_tr(int searchIndex, ref int outBegin, ref int outEnd)
     {
         outEnd = lineDataList.Count - 1;
         bool flag = true;
@@ -330,7 +378,7 @@ public class RecycleGrid : MonoBehaviour
         {
             if (lineDataList[i].isInView(virtualPos, ViewHeight))
             {
-                if (!onlyEnd && flag)
+                if (flag)
                 {
                     outBegin = i;
                     flag = false;
@@ -338,16 +386,14 @@ public class RecycleGrid : MonoBehaviour
             }
             else
             {
-                if ( onlyEnd )
-                {
-                    outEnd = i - 1;
-                }
+                outEnd = i - 1;
                 break;
             }
         }
     }
 
-    public int fillToTop(int searchIndex, bool onlyEnd, ref int outBegin, ref int outEnd)
+    //向上填充，找起点和终点
+    public void fillToTop_tr(int searchIndex, ref int outBegin, ref int outEnd)
     {
         outBegin = 0;
         bool flag = true;
@@ -355,7 +401,7 @@ public class RecycleGrid : MonoBehaviour
         {
             if (lineDataList[i].isInView(virtualPos, ViewHeight))
             {
-                if (!onlyEnd && flag)
+                if (flag)
                 {
                     outEnd = i;
                     flag = false;
@@ -363,10 +409,22 @@ public class RecycleGrid : MonoBehaviour
             }
             else
             {
-                if ( onlyEnd )
-                {
-                    outBegin = i + 1;
-                }
+                outBegin = i + 1;
+                break;
+            }
+        }
+    }
+
+    //向上填充，只找起点
+    public void fillToTop_end(int searchIndex, ref int outBegin)
+    {
+        outBegin = 0;
+        bool flag = true;
+        for (int i = searchIndex - 1; i >= 0; i--)
+        {
+            if (!lineDataList[i].isInView(virtualPos, ViewHeight))
+            {
+                outBegin = i + 1;
                 break;
             }
         }
@@ -379,7 +437,7 @@ public class RecycleGrid : MonoBehaviour
         int tempEnd = endIndex;
         beginIndex = -1;
         endIndex = -1;
-        bool flag = false;
+        bool flag = true;
         for (int i = tempBegin; i <= tempEnd; i++)
         {
             if (lineDataList[i].isInView(virtualPos, ViewHeight))
@@ -387,7 +445,7 @@ public class RecycleGrid : MonoBehaviour
                 if (flag)
                 {
                     beginIndex = i;
-                    flag = true;
+                    flag = false;
                 }
                 else
                 {
@@ -401,7 +459,7 @@ public class RecycleGrid : MonoBehaviour
         }
     }
 
-    public void recycleLine(lineData)
+    public void recycleLine(LineData lineData)
     {
         foreach (var s in lineData.list)
         {
@@ -413,65 +471,66 @@ public class RecycleGrid : MonoBehaviour
         }
     }
 
+    [Range(0, 100)]
+    public int testIndex = 0;
     /// <summary>
     /// 定位到某一行
     /// </summary>
     /// <param name="index"></param>
     public void setViewIndex(int index)
     {
+        if ( lineDataList.Count == 0 )
+        {
+            return;
+        }
+
+        if (index < 0 || index > lineDataList.Count )
+        {
+            Debug.Log("索引不合法");
+            return;
+        }
         for (int i = allBeginLine; i <= allEndLine; i++)
         {
             recycleLine(lineDataList[i]);
         }
 
         int findLine = -1;
-        int beginLine = -1;
-        int endLine = -1;
         for (int i = 0; i < lineDataList.Count; i++)
         {
             LineData tempData = lineDataList[i];
             if (tempData.inLine(index))
             {
-                if (i == 0)
-                {
-                    findLine = 0;
-                    virtualPos = 0;
-                }
-                else
-                {
-                    if ( tempData.childLineY.posy - (ViewHeight - tempData.lineHeight) < 0 )
-                    {
-                        findLine = 0;
-                        virtualPos = 0;
-                    }
-                    else
-                    {
-                        findLine = i;
-                    }
-                }
+                findLine = i;
                 virtualPos = tempData.childLineY.posy;
-                content.anchoredPosition = new Vector2(content.anchoredPosition.x, virtualPos);
+                ContentAnchorY = virtualPos;
                 break;
             }
         }
 
-        //如果剩余不够填满，直接拉到最低
-        if ( content.sizeDelta.y - virtualPos < viewHeight )
+        //如果定位的行不够填充整个视口，直接拉到最低
+        float tempContentHeight = ContentHeight;
+        if (tempContentHeight - virtualPos < ViewHeight )
         {
             //设置位置，向上查找
+            virtualPos = tempContentHeight - ViewHeight;
+            ContentAnchorY = virtualPos;
+            //向上填充
+            fillToTop_end(findLine, ref allBeginLine);
+            //向下填充
+            fillToBottom_end(findLine, ref allEndLine);
         }
         else
         {
-            fillToBottom()
+            allBeginLine = findLine;
+            //向下填充
+            fillToBottom_end(findLine, ref allEndLine);
         }
         
-        if (beginLine != -1 && endLine != - 1)
+        if (allBeginLine != -1 && allEndLine != - 1)
         {
-            allBeginLine = beginLine;
-            allEndLine = endLine;
-            Debug.Log("print find "+ beginLine + "  " + endLine);
+            Debug.Log("print find "+ allBeginLine + "  " + allEndLine);
+            drawView();
         }
-
     }
 
     /// <summary>
@@ -494,7 +553,6 @@ public class RecycleGrid : MonoBehaviour
         {
             ld = lineDataList[lineDataList.Count - 1];
         }
-
         return ld;
     }
 

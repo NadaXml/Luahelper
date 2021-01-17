@@ -47,10 +47,58 @@ public class LineData
         public float posX;
         //节点的y位置（上方对齐）
         public LineY ld;
+
         //节点的显示模板类型
+        public int dataIndex;
+
         public int nType;
+
+        private GameObject item;
+        private RectTransform rect;
         //节点目前使用的GamoObject
-        public GameObject item;
+        public GameObject Item
+        {
+            set
+            {
+                if (value == null)
+                {
+                    item = null;
+                    rect = null;
+                }
+                else
+                {
+                    item = value;
+                    rect = item.GetComponent<RectTransform>();
+                }
+            }
+            get
+            {
+                return item;
+            }
+        }
+
+        private static Vector2 tempPos;
+        public void renderPos()
+        {
+            tempPos.x = posX;
+            tempPos.y = -ld.posy;
+            rect.anchoredPosition = tempPos;
+        }
+
+        public void render(GridDataSource gds)
+        {
+            Debug.Log("render " + dataIndex);
+
+#if UNITY_EDITOR
+            Transform tmp = rect.transform.Find("num");
+            if (tmp != null)
+            {
+                Text tx = tmp.GetComponent<Text>();
+                tx.text = dataIndex.ToString();
+            }
+#endif
+
+        }
     }
 
     /// <summary>
@@ -124,12 +172,12 @@ public class LineData
     /// <param name="ld"></param>
     /// <param name="itemType"></param>
     /// <returns></returns>
-    public ShowCellData obtainShowCellData(float x, LineY ld, int itemType)
+    public ShowCellData obtainShowCellData(float x, LineY ld, int dataIndex)
     {
         ShowCellData scd = new ShowCellData();
         scd.posX = x;
         scd.ld = ld;
-        scd.nType = itemType;
+        scd.dataIndex = dataIndex;
         return scd;
     }
     /// <summary>
@@ -150,8 +198,10 @@ public class LineData
         else
         {
             posx = ft;
-            ShowCellData scd = obtainShowCellData(posx - source.wllt.width, childLineY, source.templateId);
+            ShowCellData scd = obtainShowCellData(posx - source.wllt.width, childLineY, index);
+            scd.nType = source.templateId;
             lineHeightDelta = Mathf.Max(lineHeight, source.wllt.height);
+            lineHeight = lineHeightDelta;
             endIndex = index;
             list.Add(scd);
             return true;
@@ -199,6 +249,8 @@ public class RecycleGrid : MonoBehaviour
     public void resetData()
     {
         itemTemplate.Reset();
+        allBeginLine = -1;
+        allEndLine = -1;
     }
 
     //视口的高度
@@ -218,9 +270,10 @@ public class RecycleGrid : MonoBehaviour
         }
     }
     //当前滑动的位置
+    static public int INVALID_POS = -1;
     public float virtualPos = 0;
-    public int allBeginLine;
-    public int allEndLine;
+    public int allBeginLine = RecycleGrid.INVALID_POS;
+    public int allEndLine = RecycleGrid.INVALID_POS;
 
     private Vector2 tempSize = Vector2.zero;
     public float ContentHeight
@@ -263,18 +316,49 @@ public class RecycleGrid : MonoBehaviour
     public void initData()
     {
         List<GridDataSource> source = dataLocator.GetDataSource();
-        
         foreach( var temp in lineDataList)
         {
             recycleLine(temp);
         }
         lineDataList.Clear();
+        fillData(0, source);
+    }
+
+    public int removeBegin = 0;
+    public int removeEnd = 0;
+    public void removeData(int begin, int end)
+    {
+        int dataCount = dataLocator.source.Count;
+        if (begin < 0 || begin >= dataCount)
+        {
+            Debug.Log("索引不合法");
+            return;
+        }
+        if ( end < 0 || end >= dataCount)
+        {
+            Debug.Log("索引不合法");
+            return;
+        }
+        for (int i = end; i >= begin; i--)
+        {
+            dataLocator.source.RemoveAt(i);
+        }
+
+        List<GridDataSource> source = dataLocator.GetDataSource();
+        begin = Math.Max(0, begin - 1);
+        fillData(begin, source);
+
+        setViewIndex(begin);
+    }
+
+    public void fillData(int beginIndex, List<GridDataSource> source)
+    {
         float tempPosY = 0;
-        for (int i = 0; i < source.Count; i++)
+        for (int i = beginIndex; i < source.Count; i++)
         {
             GridDataSource data = source[i];
             data.wllt = itemTemplate.GetWllItemTemplate(data.templateId);
-            
+
             LineData ld = GetLine(tempPosY, i, data.wllt.height);
             float heightDelta = 0;
             bool addSucess = ld.AddCell(data, i, ViewWidth, ref heightDelta);
@@ -302,6 +386,7 @@ public class RecycleGrid : MonoBehaviour
         LineData last = lineDataList[lineDataList.Count - 1];
         ContentHeight = last.childLineY.posy + last.lineHeight;
     }
+
 
     /// <summary>
     /// 列表发生滑动
@@ -351,7 +436,8 @@ public class RecycleGrid : MonoBehaviour
         if (lastEnd != allEndLine || lastBegin != allBeginLine)
         {
             Debug.Log(allBeginLine + " " + allEndLine);
-            drawView();
+            //drawView();
+            drawDirtyView(lastBegin, lastEnd, allBeginLine, allEndLine);
         }
     }
 
@@ -419,7 +505,6 @@ public class RecycleGrid : MonoBehaviour
     public void fillToTop_end(int searchIndex, ref int outBegin)
     {
         outBegin = 0;
-        bool flag = true;
         for (int i = searchIndex - 1; i >= 0; i--)
         {
             if (!lineDataList[i].isInView(virtualPos, ViewHeight))
@@ -463,15 +548,22 @@ public class RecycleGrid : MonoBehaviour
     {
         foreach (var s in lineData.list)
         {
-            if (s.item != null)
+            if (s.Item != null)
             {
-                itemTemplate.recycleItem(s.nType, s.item);
-                s.item = null;
+                itemTemplate.recycleItem(s.nType, s.Item);
+                s.Item = null;
             }
         }
     }
 
-    [Range(0, 100)]
+    public void renderLine(LineData lineData)
+    {
+        for (int j = 0; j < lineData.list.Count; j++)
+        {
+            renderCell(lineData.list[j]);
+        }
+    }
+
     public int testIndex = 0;
     /// <summary>
     /// 定位到某一行
@@ -484,16 +576,19 @@ public class RecycleGrid : MonoBehaviour
             return;
         }
 
-        if (index < 0 || index > lineDataList.Count )
+        if (index < 0 || index >= dataLocator.source.Count )
         {
             Debug.Log("索引不合法");
             return;
         }
-        for (int i = allBeginLine; i <= allEndLine; i++)
-        {
-            recycleLine(lineDataList[i]);
-        }
+        //for (int i = allBeginLine; i <= allEndLine; i++)
+        //{
+        //    recycleLine(lineDataList[i]);
+        //}
 
+        int lastBegin = allBeginLine;
+        int lastEnd = allEndLine;
+        
         int findLine = -1;
         for (int i = 0; i < lineDataList.Count; i++)
         {
@@ -526,10 +621,17 @@ public class RecycleGrid : MonoBehaviour
             fillToBottom_end(findLine, ref allEndLine);
         }
         
-        if (allBeginLine != -1 && allEndLine != - 1)
+        if (lastBegin != allBeginLine || lastEnd != allEndLine)
         {
             Debug.Log("print find "+ allBeginLine + "  " + allEndLine);
-            drawView();
+            if (lastBegin == -1 || lastEnd == -1)
+            {
+                drawView();
+            }
+            else
+            {
+                drawDirtyView(lastBegin, lastEnd, allBeginLine, allEndLine);
+            }
         }
     }
 
@@ -556,6 +658,65 @@ public class RecycleGrid : MonoBehaviour
         return ld;
     }
 
+    private Vector2 tmpPos = Vector2.zero;
+    public void drawDirtyView(int lastBegin, int lastEnd, int curBegin, int curEnd)
+    {
+        //集合重合
+        if (lastBegin == curBegin && lastEnd == curEnd)
+        {
+            return;
+        }
+
+        //没有交集
+        if (lastEnd > curBegin || curEnd > lastBegin)
+        {
+            for (int i = lastBegin; i <= lastEnd; i++)
+            {
+                recycleLine(lineDataList[i]);
+            }
+
+            for(int i = curBegin; i <= curEnd; i++)
+            {
+                renderLine(lineDataList[i]);
+            }
+        }
+        //有交集
+        else
+        {
+            //比较起点
+            if(lastBegin > curBegin)
+            {
+                for(int i = curBegin + 1; i <= lastBegin; i++)
+                {
+                    recycleLine(lineDataList[i]);  
+                }
+            }
+            else
+            {
+                for(int i = lastBegin + 1; i <= curBegin; i++)
+                {
+                    renderLine(lineDataList[i]);
+                }
+            }
+
+            //比较终点
+            if (lastEnd > curEnd)
+            {
+                for (int i = curEnd + 1; i <= lastEnd; i++)
+                {
+                    recycleLine(lineDataList[i]);
+                }
+            }
+            else
+            {
+                for (int i = lastEnd + 1; i <= curEnd; i++)
+                {
+                    renderLine(lineDataList[i]);
+                }
+            }
+        }
+    }
+
     /// <summary>
     /// 绘制当前视口的数据
     /// </summary>
@@ -566,17 +727,22 @@ public class RecycleGrid : MonoBehaviour
             var lineData = lineDataList[i];
             for (int j = 0; j < lineData.list.Count; j++)
             {
-                var scd = lineData.list[j];
-                if (scd.item == null )
-                {
-                    scd.item = itemTemplate.findItem(scd.nType);
-                }
-                GameObject set = scd.item;
-                Vector2 v2 = new Vector2(scd.posX, -scd.ld.posy);
-                set.transform.SetParent(content);
-                set.SetActive(true);
-                set.GetComponent<RectTransform>().anchoredPosition = v2;
+                renderCell(lineData.list[j]);
             }
         }
+    }
+
+    public void renderCell(LineData.ShowCellData showData)
+    {
+        LineData.ShowCellData scd = showData;
+        if (scd.Item == null)
+        {
+            scd.Item = itemTemplate.findItem(scd.nType);
+            scd.Item.transform.SetParent(content);
+            scd.Item.SetActive(true);
+        }
+        scd.renderPos();
+        GridDataSource gds = dataLocator.source[scd.dataIndex];
+        scd.render(gds);
     }
 }

@@ -10,6 +10,9 @@ public class WllTemplate
     public string path;
     public float width;
     public float height;
+#if UNITY_EDITOR
+    public GameObject tItem;
+    #endif
 }
 
 //Cell模板
@@ -20,11 +23,7 @@ public class ItemTemplate : MonoBehaviour
         t = 1,
         eidtor = 2
     }  
-    public sType templateType = sType.eidtor;
-    /// <summary>
-    /// 自测Item设置
-    /// </summary>
-    public List<GameObject> itemTemplate = new List<GameObject>();
+    public sType templateType = sType.t;
 
     /// <summary>
     /// wll子预制路径
@@ -34,11 +33,6 @@ public class ItemTemplate : MonoBehaviour
     public WllTemplate GetWllItemTemplate(int nType)
     {
         return subItemTemplate[nType];
-    }
-
-    public GameObject GetItemTemplate(int nType)
-    {
-        return itemTemplate[nType];
     }
 
     public void Reset()
@@ -104,7 +98,12 @@ public class ItemTemplate : MonoBehaviour
         }       
         else
         {
-            return GameObject.Instantiate<GameObject>(itemTemplate[nType-1]);
+#if UNITY_EDITOR
+            WllTemplate template = GetWllItemTemplate(nType);
+            return GameObject.Instantiate<GameObject>(template.tItem);
+#else
+            return null;
+#endif
         }
     }
 

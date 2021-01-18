@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -21,7 +24,11 @@ public class GridDataLocator
 
     public void loadPrefab(List<GridDataSource> source)
     {
-        this.source = source;
+        this.source = new List<GridDataSource>();
+        foreach ( var temp in source)
+        {
+            this.source.Add(temp);
+        }
     }
 
     public List<GridDataSource> GetDataSource()
@@ -47,15 +54,13 @@ public class LineData
         public float posX;
         //节点的y位置（上方对齐）
         public LineY ld;
-
         //节点的显示模板类型
         public int dataIndex;
-
+        //item模板类型
         public int nType;
-
+        //节点目前使用的GamoObject
         private GameObject item;
         private RectTransform rect;
-        //节点目前使用的GamoObject
         public GameObject Item
         {
             set
@@ -131,6 +136,16 @@ public class LineData
         LineData ld;
         ld = obtainLineData(i, originHeight, deltaY);
         return ld;
+    }
+
+    public void clearLine()
+    {
+        lineHeight = 0;
+        beginIndex = 0;
+        endIndex = 0;
+        childLineY.posy = 0;
+        list.Clear();
+        posx = 0;
     }
 
     //行高度
@@ -326,6 +341,7 @@ public class RecycleGrid : MonoBehaviour
 
     public int removeBegin = 0;
     public int removeEnd = 0;
+    //目前只支持删除可见区域内的数据
     public void removeData(int begin, int end)
     {
         int dataCount = dataLocator.source.Count;
@@ -339,16 +355,28 @@ public class RecycleGrid : MonoBehaviour
             Debug.Log("索引不合法");
             return;
         }
+        //删除数据
         for (int i = end; i >= begin; i--)
         {
             dataLocator.source.RemoveAt(i);
         }
-
+        //删除这个位置后面的数据
+        bool needClear = false;
+        int fillBeginIndex = 0;
+        for (int i = lineDataList.Count -1 ; i >= 0; i--)
+        {
+            LineData ld = lineDataList[i];
+            fillBeginIndex = ld.beginIndex;
+            recycleLine(ld);
+            lineDataList.RemoveAt(i);
+            if (ld.inLine(begin))
+            {
+                break;
+            }           
+        }
         List<GridDataSource> source = dataLocator.GetDataSource();
-        begin = Math.Max(0, begin - 1);
-        fillData(begin, source);
-
-        setViewIndex(begin);
+        fillData(fillBeginIndex, source);
+        setViewIndex(fillBeginIndex, true);
     }
 
     public void fillData(int beginIndex, List<GridDataSource> source)
@@ -523,6 +551,19 @@ public class RecycleGrid : MonoBehaviour
         beginIndex = -1;
         endIndex = -1;
         bool flag = true;
+
+        int dataCount = lineDataList.Count;
+        if (tempBegin < 0 || tempBegin >= dataCount)
+        {
+            Debug.Log("索引不合法");
+            return;
+        }
+        if (tempEnd < 0 || tempEnd >= dataCount)
+        {
+            Debug.Log("索引不合法");
+            return;
+        }
+
         for (int i = tempBegin; i <= tempEnd; i++)
         {
             if (lineDataList[i].isInView(virtualPos, ViewHeight))
@@ -569,7 +610,7 @@ public class RecycleGrid : MonoBehaviour
     /// 定位到某一行
     /// </summary>
     /// <param name="index"></param>
-    public void setViewIndex(int index)
+    public void setViewIndex(int index, bool force)
     {
         if ( lineDataList.Count == 0 )
         {
@@ -624,7 +665,7 @@ public class RecycleGrid : MonoBehaviour
         if (lastBegin != allBeginLine || lastEnd != allEndLine)
         {
             Debug.Log("print find "+ allBeginLine + "  " + allEndLine);
-            if (lastBegin == -1 || lastEnd == -1)
+            if (lastBegin == -1 || lastEnd == -1 || force)
             {
                 drawView();
             }

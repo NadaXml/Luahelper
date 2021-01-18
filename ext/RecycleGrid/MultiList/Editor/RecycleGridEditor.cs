@@ -7,12 +7,6 @@ using System.Collections.Generic;
 namespace UnityEditor.UI
 {
 
-    [CreateAssetMenu(fileName = "MockListData.asset", menuName = "UGUI/MultiList数据/生成")]
-    public class MockListData : ScriptableObject
-    {
-        public GridDataLocator data;
-    }
-
     [CustomEditor(typeof(RecycleGrid), true)]
     [CanEditMultipleObjects]
     public class RecycleGridEditor : Editor
@@ -69,7 +63,7 @@ namespace UnityEditor.UI
             {
                 rg.resetData();
                 rg.initData();
-                rg.setViewIndex(0);
+                rg.setViewIndex(0, true);
             }
             EditorGUILayout.EndHorizontal();
 
@@ -77,7 +71,7 @@ namespace UnityEditor.UI
             EditorGUILayout.PropertyField(sp_testIndex, true);
             if (GUILayout.Button("定位到", createStyle(), GUILayout.Width(24), GUILayout.Height(16)))
             {
-                rg.setViewIndex(rg.testIndex);
+                rg.setViewIndex(rg.testIndex, false);
             }
             EditorGUILayout.EndHorizontal();
 

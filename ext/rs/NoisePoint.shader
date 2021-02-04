@@ -2,12 +2,10 @@
 {
     Properties
     {
+		//圆贴图
+        _MainTex ("MainTex", 2D) = "white" {}
 		//方格登分Mask纹理
-        _MaskTex ("MaskTex", 2D) = "white" {}
-		//圆贴图
-		_PointTex("PointTex", 2D) = "white" {}
-		//圆贴图
-		_PointTex2("PointTex2", 2D) = "white" {}
+		_GridTxt("GridTxt", 2D) = "white" {}
 		//圆半径（不可小于等分）
 		_radius("radius", Range(0,1)) = 0.15
 		//圆半径（缩放用）要比圆半径小
@@ -18,43 +16,78 @@
 		_pointNoise("pointNoise", float) = 10
 		//Spark大小
 		_sparkAffect("sparkAffect", float) = 10
-			//辅助线
-		_helper("helper", Range(0,1)) = 0
+
+		//UIDefault需要用到的
+		//_StencilComp("Stencil Comparison", Float) = 8
+  //      _Stencil("Stencil ID", Float) = 0
+  //      _StencilOp("Stencil Operation", Float) = 0
+  //      _StencilWriteMask("Stencil Write Mask", Float) = 255
+  //      _StencilReadMask("Stencil Read Mask", Float) = 255
+ 
+        _ColorMask("Color Mask", Float) = 15
+
     }
     SubShader
     {
 		Tags
 		{
 			"Queue" = "Transparent"
+			"IgnoreProjector" = "True"
 			"RenderType" = "Transparent"
+			"PreviewType" = "Plane"
+			"CanUseSpriteAtlas" = "True"
 		}
 
+		//Stencil
+		//{
+		//	Ref[_Stencil]
+		//	Comp[_StencilComp]
+		//	Pass[_StencilOp]
+		//	ReadMask[_StencilReadMask]
+		//	WriteMask[_StencilWriteMask]
+		//}
+ 
 		Cull Off
+		Lighting Off
+		ZWrite Off
+		//ZTest[unity_GUIZTestMode]
 		Blend SrcAlpha OneMinusSrcAlpha
-
-		// No culling or depth
-        Cull Off 
-		ZWrite Off 
-		ZTest Always
+		ColorMask[_ColorMask]
 
         Pass
         {
             CGPROGRAM
-            #pragma vertex vert
-            #pragma fragment frag
+			#pragma vertex vert
+			#pragma fragment frag
+			#pragma target 2.0
 
             #include "UnityCG.cginc"
+			#include "UnityUI.cginc"
+
+			#pragma multi_compile __ UNITY_UI_CLIP_RECT
+			
+			sampler2D _MainTex;
+			sampler2D _GridTxt;
+			fixed _radius;
+			fixed _radiusScale;
+			fixed _dxy;
+			fixed _pointNoise;
+			fixed _sparkAffect;
+
+			float4 _ClipRect;
 
             struct appdata
             {
                 float4 vertex : POSITION;
                 float2 uv : TEXCOORD0;
+				UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct v2f
             {
-                float2 uv : TEXCOORD0;
                 float4 vertex : SV_POSITION;
+				float2 uv : TEXCOORD0;
+				float4 worldPosition : TEXCOORD1;
             };
 
             v2f vert (appdata v)
@@ -62,20 +95,15 @@
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
 				o.uv = v.uv;
+
+				UNITY_SETUP_INSTANCE_ID(v);
+				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(OUT);
+				o.worldPosition = v.vertex;
+
                 return o;
             }
 
-            sampler2D _MainTex;
-			sampler2D _PointTex;
-			sampler2D _PointTex2;
-			fixed _radius;
-			fixed _radiusScale;
-			fixed _dxy;
-			fixed _pointNoise;
 
-			fixed _sparkAffect;
-
-			fixed _helper;
 
 			//噪波函数（b站搬运工）
 			fixed N21(fixed2 p)
@@ -113,7 +141,7 @@
 				//最终颜色
 				fixed4 col = fixed4(0, 0, 0, 0);
 				//方格mask值采样
-				fixed4 maska = tex2D(_PointTex2, (i.uv - 1/ _dxy / 2));
+				fixed4 maska = tex2D(_GridTxt, (i.uv - 1/ _dxy / 2));
 				//颜色叠加
 				fixed4 add = fixed4(1, 1, 1,1);
 				//噪波处理后的uv值[0,1]
@@ -132,15 +160,19 @@
 				//float m = 1 / dot(j,j) * scale;
 				
 				//采样纹理
-				//fixed no = 1-step(_radius * scale, d);
-				//fixed2 newUV = fixed2(gv.x - p1.x + 0.5, gv.y- p1.y + 0.5);
-				//col = no * tex2D(_PointTex, fixed2(newUV));
+				fixed no = 1-step(_radius * scale, d);
+				fixed2 newUV = fixed2(gv.x - p1.x + 0.5, gv.y- p1.y + 0.5);
+				col = no * tex2D(_MainTex, fixed2(newUV));
 
 				col.a *= maska.x;
 
 				//网格辅助参考线
 				if (gv.x > 0.48 || gv.y > 0.48) col = float4(1, 0, 0, 1);
 				
+                 #ifdef UNITY_UI_CLIP_RECT
+					col.a *= UnityGet2DClipping(i.worldPosition.xy, _ClipRect);
+                 #endif
+
 				return col;
             }
             ENDCG

@@ -12,7 +12,7 @@ namespace UnityEditor.UI
     public class RecycleGridEditor : Editor
     {
         RecycleGrid rg;
-        //定位到第几个
+
         SerializedProperty sp_scrollRect;
         SerializedProperty sp_viewport;
         SerializedProperty sp_content;
@@ -24,7 +24,9 @@ namespace UnityEditor.UI
         SerializedProperty sp_testIndex;
         SerializedProperty sp_removeBegin;
         SerializedProperty sp_removeEnd;
+        SerializedProperty sp_padding;
 
+        //模拟的cell数据
         MockListData dataObj;
 
         ScrollRect scrollRect;
@@ -42,6 +44,7 @@ namespace UnityEditor.UI
             sp_removeBegin = serializedObject.FindProperty("removeBegin");
             sp_removeEnd = serializedObject.FindProperty("removeEnd");
             sp_testIndex = serializedObject.FindProperty("testIndex");
+            sp_padding = serializedObject.FindProperty("padding");
         }
 
         public override void OnInspectorGUI()
@@ -58,6 +61,7 @@ namespace UnityEditor.UI
             EditorGUILayout.PropertyField(sp_itemTemplate, true);
             EditorGUILayout.PropertyField(sp_allBeginLine, true);
             EditorGUILayout.PropertyField(sp_allEndLine, true);
+            EditorGUILayout.PropertyField(sp_padding, true);
 
             if (GUILayout.Button("预览", createStyle(), GUILayout.Width(24), GUILayout.Height(16)))
             {

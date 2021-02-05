@@ -7,10 +7,11 @@ using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
 using UnityEngine.UI;
 
-//显示数据
+//数据格式
 [System.Serializable]
 public class GridDataSource
 {
+    //引用的Id
     public int templateId;
     public WllTemplate wllt;
 }
@@ -19,9 +20,10 @@ public class GridDataSource
 [System.Serializable]
 public class GridDataLocator
 {
-    //所有数据
+    //数据源
     public List<GridDataSource> source;
 
+    //加载数据
     public void loadPrefab(List<GridDataSource> source)
     {
         this.source = new List<GridDataSource>();
@@ -43,6 +45,8 @@ public class LineData
     //Grid 显示数据
     public class LineY
     {
+        //y方向的坐标
+        //节点的y位置（上方对齐）
         public float posy;
     }
 
@@ -52,7 +56,7 @@ public class LineData
     {
         //节点的x位置
         public float posX;
-        //节点的y位置（上方对齐）
+        //节点公用的行数据
         public LineY ld;
         //节点的显示模板类型
         public int dataIndex;
@@ -61,6 +65,7 @@ public class LineData
         //节点目前使用的GamoObject
         private GameObject item;
         private RectTransform rect;
+        //引用的子预制
         public GameObject Item
         {
             set
@@ -107,11 +112,11 @@ public class LineData
     }
 
     /// <summary>
-    /// New一行
+    /// create行的显示数据
     /// </summary>
-    /// <param name="beginIndex"></param>
-    /// <param name="lineHeight"></param>
-    /// <param name="childPosy"></param>
+    /// <param name="beginIndex">cell起始索引</param>
+    /// <param name="lineHeight">行高度</param>
+    /// <param name="childPosy">垂直方向坐标</param>
     /// <returns></returns>
     static public LineData obtainLineData(int beginIndex, float lineHeight, float childPosy)
     {
@@ -126,9 +131,9 @@ public class LineData
     /// <summary>
     /// 新生成一行
     /// </summary>
-    /// <param name="deltaY"></param>
-    /// <param name="i"></param>
-    /// <param name="originHeight"></param>
+    /// <param name="deltaY">垂直方向坐标</param>
+    /// <param name="i">行索引</param>
+    /// <param name="originHeight">行初始高度</param>
     /// <returns></returns>
     static public LineData NewLine(float deltaY, int i, float originHeight)
     {
@@ -138,6 +143,9 @@ public class LineData
         return ld;
     }
 
+    /// <summary>
+    /// 清理显示行数据（没有回收Item）
+    /// </summary>
     public void clearLine()
     {
         lineHeight = 0;
@@ -161,7 +169,7 @@ public class LineData
     //行的X坐标（结尾的位置）
     public float posx = 0;
     /// <summary>
-    /// index是否在行内
+    /// cell的索引是否在行内
     /// </summary>
     /// <param name="index">cell的Index</param>
     /// <returns>true：cell在行内 false：cell不在行内</returns>
@@ -170,22 +178,23 @@ public class LineData
         return beginIndex <= index && endIndex >= index;
     }
     /// <summary>
-    /// 当前行是否在ViewPort中
+    /// 显示的行是否在viewport中
     /// </summary>
-    /// <param name="virtualPos"></param>
-    /// <param name="viewHeight"></param>
-    /// <returns></returns>
+    /// <param name="virtualPos">contet区域的y方向坐标</param>
+    /// <param name="viewHeight">视口的高度</param>
+    /// <returns>true: 行在视口内 false:行不在视口内</returns>
     public bool isInView(float virtualPos, float viewHeight)
     {
         float delta = childLineY.posy - virtualPos;
         return delta + lineHeight > 0 && delta < viewHeight;
     }
+
     /// <summary>
-    /// New一个节点
+    /// create新的cell数据
     /// </summary>
-    /// <param name="x"></param>
-    /// <param name="ld"></param>
-    /// <param name="itemType"></param>
+    /// <param name="x">x的坐标</param>
+    /// <param name="ld">y的坐标</param>
+    /// <param name="dataIndex">datasource的索引</param>
     /// <returns></returns>
     public ShowCellData obtainShowCellData(float x, LineY ld, int dataIndex)
     {
@@ -195,18 +204,28 @@ public class LineData
         scd.dataIndex = dataIndex;
         return scd;
     }
+
+    /// 
     /// <summary>
-    /// 添加节点到这一行
+    /// 添加cell到这一行
     /// </summary>
-    /// <param name="rect"></param>
-    /// <param name="index"></param>
-    /// <param name="viewWidth"></param>
-    /// <param name="lineHeightDelta"></param>
+    /// <param name="source">cell的数据</param>
+    /// <param name="index">数据列表的下标</param>
+    /// <param name="viewWidth">视口宽度</param>
+    /// <param name="lineHeightDelta">行高度</param>
     /// <returns></returns>
-    public bool AddCell(GridDataSource source, int index, float viewWidth, ref float lineHeightDelta)
+    public bool AddCell(GridDataSource source, int index, RecycleGrid grid, ref float lineHeightDelta)
     {
         float ft = posx + source.wllt.width;
-        if (ft > viewWidth)
+        if (list.Count == 0)
+        {
+            ft = ft + grid.padding.left;
+        }
+        else
+        {
+            ft = ft + grid.padding.spacex;
+        }
+        if (ft > grid.ViewWidth)
         {
             return false;
         }
@@ -222,20 +241,6 @@ public class LineData
             return true;
         }
     }
-
-    /// <summary>
-    /// 数据初始化的时候更新当前行的高度
-    /// </summary>
-    /// <param name="dStep"></param>
-    /// <param name="lineHeight"></param>
-    private void stepLineData(float dStep, List<LineData> lineHeight)
-    {
-        for (int j = 0; j < lineHeight.Count; j++)
-        {
-            LineData topLine = lineHeight[j];
-            topLine.childLineY.posy += dStep;
-        }
-    }
 }
 
 public class RecycleGrid : MonoBehaviour
@@ -247,13 +252,16 @@ public class RecycleGrid : MonoBehaviour
     //滑动区域
     public ScrollRect scrollRect;
     //偏移
-    struct padding
+    [Serializable]
+    public class Padding
     {
         public float top;
         public float bottom;
         public float left;
-        public float right;
+        public float spacex;
+        public float spacey;
     }
+    public Padding padding;
     //所有行的信息
     public List<LineData> lineDataList = new List<LineData>();
     //数据源
@@ -264,8 +272,8 @@ public class RecycleGrid : MonoBehaviour
     public void resetData()
     {
         itemTemplate.Reset();
-        allBeginLine = -1;
-        allEndLine = -1;
+        allBeginLine = INVALID_POS;
+        allEndLine = INVALID_POS;
     }
 
     //视口的高度
@@ -284,13 +292,25 @@ public class RecycleGrid : MonoBehaviour
             return viewport.rect.width;
         }
     }
-    //当前滑动的位置
     static public int INVALID_POS = -1;
+    /// <summary>
+    /// content滑动的位置，正数
+    /// </summary>
     public float virtualPos = 0;
+    
+    /// <summary>
+    /// 当前显示的行起始
+    /// </summary>
     public int allBeginLine = RecycleGrid.INVALID_POS;
+    /// <summary>
+    /// 当前显示的行起始
+    /// </summary>
     public int allEndLine = RecycleGrid.INVALID_POS;
 
     private Vector2 tempSize = Vector2.zero;
+    /// <summary>
+    /// 内容区域长度
+    /// </summary>
     public float ContentHeight
     {
         get
@@ -304,8 +324,10 @@ public class RecycleGrid : MonoBehaviour
             content.sizeDelta = tempSize;
         }
     }
-
     private Vector2 tempAnchor = Vector2.zero;
+    /// <summary>
+    /// content
+    /// </summary>
     public float ContentAnchorY
     {
         get
@@ -361,7 +383,6 @@ public class RecycleGrid : MonoBehaviour
             dataLocator.source.RemoveAt(i);
         }
         //删除这个位置后面的数据
-        bool needClear = false;
         int fillBeginIndex = 0;
         for (int i = lineDataList.Count -1 ; i >= 0; i--)
         {
@@ -379,9 +400,14 @@ public class RecycleGrid : MonoBehaviour
         setViewIndex(fillBeginIndex, true);
     }
 
+    /// <summary>
+    /// 计算显示cell需要的数据，按行存储
+    /// </summary>
+    /// <param name="beginIndex">开始计算的cell索引</param>
+    /// <param name="source">数据源</param>
     public void fillData(int beginIndex, List<GridDataSource> source)
     {
-        float tempPosY = 0;
+        float tempPosY = padding.top;
         for (int i = beginIndex; i < source.Count; i++)
         {
             GridDataSource data = source[i];
@@ -389,16 +415,15 @@ public class RecycleGrid : MonoBehaviour
 
             LineData ld = GetLine(tempPosY, i, data.wllt.height);
             float heightDelta = 0;
-            bool addSucess = ld.AddCell(data, i, ViewWidth, ref heightDelta);
+            bool addSucess = ld.AddCell(data, i, this, ref heightDelta);
             if (!addSucess)
             {
                 //滑动位置
-                tempPosY = tempPosY + ld.lineHeight;
-
+                tempPosY = tempPosY + ld.lineHeight + padding.spacey;
                 //新增一行
                 ld = LineData.NewLine(tempPosY, i, data.wllt.height);
 
-                addSucess = ld.AddCell(data, i, ViewWidth, ref heightDelta);
+                addSucess = ld.AddCell(data, i, this, ref heightDelta);
                 if (!addSucess)
                 {
                     Debug.LogError("Item的大小不合适窗口的大小");
@@ -412,15 +437,12 @@ public class RecycleGrid : MonoBehaviour
         }
         //控制content的长度
         LineData last = lineDataList[lineDataList.Count - 1];
-        ContentHeight = last.childLineY.posy + last.lineHeight;
+        ContentHeight = last.childLineY.posy + last.lineHeight + padding.bottom;
     }
-
-
     /// <summary>
-    /// 列表发生滑动
+    /// 列表发生滑动，新增显示行，减少显示行
     /// </summary>
-    /// <param name="x"></param>
-    /// <param name="y"></param>
+    /// <param name="v2"></param>
     public void OnScorll(Vector2 v2)
     {
         int lastBegin = allBeginLine;
@@ -433,10 +455,15 @@ public class RecycleGrid : MonoBehaviour
         //设置当前滑动的位置
         virtualPos = tempContentY;
         checkCurrentVisiable(ref allBeginLine, ref allEndLine);
+
+        if(allBeginLine == INVALID_POS && allEndLine == INVALID_POS)
+        {
+            return;
+        }
         //向上划
         if (upTodown)
-        {
-            bool onylEnd = allEndLine != -1;
+        { 
+            bool onylEnd = allEndLine != INVALID_POS;
             int tempIndex = onylEnd ? allEndLine : lastEnd;
             if ( onylEnd )
             {
@@ -450,7 +477,7 @@ public class RecycleGrid : MonoBehaviour
         //向下划
         else
         {
-            bool onylEnd = allBeginLine != -1;
+            bool onylEnd = allBeginLine != INVALID_POS;
             int tempIndex = onylEnd ? allBeginLine : lastBegin;
             if ( onylEnd )
             {
@@ -461,6 +488,10 @@ public class RecycleGrid : MonoBehaviour
                 fillToTop_tr(tempIndex, ref allBeginLine, ref allEndLine);
             }
         }
+        if (allEndLine == INVALID_POS && allBeginLine == INVALID_POS)
+        {
+            return;
+        }
         if (lastEnd != allEndLine || lastBegin != allBeginLine)
         {
             Debug.Log(allBeginLine + " " + allEndLine);
@@ -469,24 +500,37 @@ public class RecycleGrid : MonoBehaviour
         }
     }
 
-    //向下填充，找终点
+    /// <summary>
+    /// 从指定可见位置，向下找结束行
+    /// </summary>
+    /// <param name="searchIndex">开始查找的行索引</param>
+    /// <param name="outEnd">查找到的结束行</param>
     public void fillToBottom_end(int searchIndex, ref int outEnd)
     {
-        outEnd = lineDataList.Count - 1;
+        outEnd = searchIndex;
         for (int i = searchIndex + 1; i < lineDataList.Count; i++)
         {
-            if (!lineDataList[i].isInView(virtualPos, ViewHeight))
+            if (lineDataList[i].isInView(virtualPos, ViewHeight))
             {
-                outEnd = i - 1;
+                outEnd = i;
+            }
+            else
+            {
                 break;
             }
         }
     }
 
-    //向下填充，找起点和重点
+    /// <summary>
+    /// 从指定不可见位置，向下找可见的开始行和结束行
+    /// </summary>
+    /// <param name="searchIndex">开始查找的行索引</param>
+    /// <param name="outBegin">查找到的开始行</param>
+    /// <param name="outEnd">查找到的结束行</param>
     public void fillToBottom_tr(int searchIndex, ref int outBegin, ref int outEnd)
     {
-        outEnd = lineDataList.Count - 1;
+        outBegin = INVALID_POS;
+        outEnd = INVALID_POS;
         bool flag = true;
         for (int i = searchIndex + 1; i < lineDataList.Count; i++)
         {
@@ -495,21 +539,32 @@ public class RecycleGrid : MonoBehaviour
                 if (flag)
                 {
                     outBegin = i;
+                    outEnd = i;
                     flag = false;
-                } 
+                }
+                else
+                {
+                    outEnd = i;
+                }
             }
             else
             {
-                outEnd = i - 1;
                 break;
             }
         }
     }
 
-    //向上填充，找起点和终点
+
+    /// <summary>
+    /// 从指定不可见位置，向上可见的开始行和结束行
+    /// </summary>
+    /// <param name="searchIndex">开始查找的行索引</param>
+    /// <param name="outBegin"></param>
+    /// <param name="outEnd"></param>
     public void fillToTop_tr(int searchIndex, ref int outBegin, ref int outEnd)
     {
-        outBegin = 0;
+        outBegin = INVALID_POS;
+        outEnd = INVALID_POS;
         bool flag = true;
         for (int i = searchIndex - 1; i >= 0; i--)
         {
@@ -518,52 +573,65 @@ public class RecycleGrid : MonoBehaviour
                 if (flag)
                 {
                     outEnd = i;
+                    outBegin = i;
                     flag = false;
+                }
+                else
+                {
+                    outBegin = i;
                 }
             }
             else
             {
-                outBegin = i + 1;
                 break;
             }
         }
     }
 
-    //向上填充，只找起点
+    /// <summary>
+    /// 从指定可见位置，向上找开始行
+    /// </summary>
+    /// <param name="searchIndex"></param>
+    /// <param name="outBegin"></param>
     public void fillToTop_end(int searchIndex, ref int outBegin)
     {
-        outBegin = 0;
+        outBegin = searchIndex;
         for (int i = searchIndex - 1; i >= 0; i--)
         {
-            if (!lineDataList[i].isInView(virtualPos, ViewHeight))
+            if (lineDataList[i].isInView(virtualPos, ViewHeight))
             {
-                outBegin = i + 1;
+                outBegin = i;
+            }
+            else
+            {
                 break;
             }
         }
     }
 
-    //检查当前显示区域的合法性
+
+    /// <summary>
+    /// 检查当前显示区域的合法性
+    /// </summary>
+    /// <param name="beginIndex">返回可显示的开始行</param>
+    /// <param name="endIndex">返回可显示的结束行</param>
     public void checkCurrentVisiable(ref int beginIndex, ref int endIndex)
     {
         int tempBegin = beginIndex;
         int tempEnd = endIndex;
-        beginIndex = -1;
-        endIndex = -1;
-        bool flag = true;
-
+        beginIndex = INVALID_POS;
+        endIndex = INVALID_POS;
         int dataCount = lineDataList.Count;
         if (tempBegin < 0 || tempBegin >= dataCount)
         {
-            Debug.Log("索引不合法");
             return;
         }
         if (tempEnd < 0 || tempEnd >= dataCount)
         {
-            Debug.Log("索引不合法");
             return;
         }
 
+        bool flag = true;
         for (int i = tempBegin; i <= tempEnd; i++)
         {
             if (lineDataList[i].isInView(virtualPos, ViewHeight))
@@ -583,8 +651,17 @@ public class RecycleGrid : MonoBehaviour
                 recycleLine(lineDataList[i]);
             }
         }
+        //只有一行可见，索引重合
+        if (beginIndex != INVALID_POS && endIndex == INVALID_POS)
+        {
+            endIndex = beginIndex;
+        }
     }
 
+    /// <summary>
+    /// 回收这一行的cell
+    /// </summary>
+    /// <param name="lineData"></param>
     public void recycleLine(LineData lineData)
     {
         foreach (var s in lineData.list)
@@ -597,6 +674,10 @@ public class RecycleGrid : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// render这一行的cell
+    /// </summary>
+    /// <param name="lineData"></param>
     public void renderLine(LineData lineData)
     {
         for (int j = 0; j < lineData.list.Count; j++)
@@ -605,32 +686,33 @@ public class RecycleGrid : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Editor测试变量
+    /// </summary>
     public int testIndex = 0;
     /// <summary>
-    /// 定位到某一行
+    /// 定位显示到某一行
     /// </summary>
     /// <param name="index"></param>
     public void setViewIndex(int index, bool force)
     {
+        //空列表
         if ( lineDataList.Count == 0 )
         {
             return;
         }
 
+        //不合法索引
         if (index < 0 || index >= dataLocator.source.Count )
         {
             Debug.Log("索引不合法");
             return;
         }
-        //for (int i = allBeginLine; i <= allEndLine; i++)
-        //{
-        //    recycleLine(lineDataList[i]);
-        //}
 
         int lastBegin = allBeginLine;
         int lastEnd = allEndLine;
         
-        int findLine = -1;
+        int findLine = INVALID_POS;
         for (int i = 0; i < lineDataList.Count; i++)
         {
             LineData tempData = lineDataList[i];
@@ -648,7 +730,14 @@ public class RecycleGrid : MonoBehaviour
         if (tempContentHeight - virtualPos < ViewHeight )
         {
             //设置位置，向上查找
-            virtualPos = tempContentHeight - ViewHeight;
+            if (tempContentHeight >= ViewHeight)
+            {
+                virtualPos = tempContentHeight - ViewHeight;
+            }
+            else
+            {
+                virtualPos = 0;
+            }
             ContentAnchorY = virtualPos;
             //向上填充
             fillToTop_end(findLine, ref allBeginLine);
@@ -665,7 +754,7 @@ public class RecycleGrid : MonoBehaviour
         if (lastBegin != allBeginLine || lastEnd != allEndLine)
         {
             Debug.Log("print find "+ allBeginLine + "  " + allEndLine);
-            if (lastBegin == -1 || lastEnd == -1 || force)
+            if (lastBegin == INVALID_POS || lastEnd == INVALID_POS || force)
             {
                 drawView();
             }
@@ -677,7 +766,7 @@ public class RecycleGrid : MonoBehaviour
     }
 
     /// <summary>
-    /// 得到某一行的大小数据,根据行号
+    /// 得到一行的显示数据
     /// </summary>
     /// <param name="deltaY"></param>
     /// <param name="i"></param>

@@ -16,6 +16,7 @@ public class WllTemplate
 
 //Cell模板
 [System.Serializable]
+[SLua.CustomLuaClass]
 public class ItemTemplate : MonoBehaviour
 {
     /// <summary>

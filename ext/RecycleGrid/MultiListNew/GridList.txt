@@ -1,0 +1,130 @@
+local GridList = {}
+local UI = UnityEngine.UI
+
+function GridList:init(go)
+    self.gridLayout = tgo:GetComponent(RecycleGrid)
+    self.ItemTemplate = tgo:GetComponent(ItemTemplate)
+    self:resetData()
+
+    self.onRenderCallback = nil
+    self.onHideCallBack = nil
+    self.onInitCallBack = nil
+
+    gridLayout.onCellRenderHandler = function(dataIndex, nType, itemKey, pos, sData)
+        local poolList = poolMap[nType]
+        local cItem = poolList.itemMap[itemKey]
+        local rc = cItem:GetComponent(UI.RectTransform)
+        rc.anchoredPosition = pos
+        if self.onRenderCallback ~= nil then
+            self.onRenderCallback()
+        end
+    end
+    gridLayout.onCellRecycleHandler = function(dataIndex, nType, itemKey)
+        local poolList = poolMap[nType]
+        local cItem = self:unUseItem(poolList, itemKey)
+        cItem:SetActive(false)
+        if self.onHideCallBack ~= nil then
+            self.onHideCallBack()
+        end
+    end
+    gridLayout.onCellInitHandler = function(path, nType, content)
+        return findItem(path, nType, content)
+    end
+end
+
+function GridList:resetData()
+    self.allKey = 0
+    self.poolMap = {}
+end
+
+function GridList:destroy()
+    for k , v in pairs(self.poolMap) do
+        for _, panel in pairs(v.itemMap) do
+            panel:destroy()
+        end 
+    end
+    self.poolMap = nil
+end
+
+function GridList:appendItem(_poolList, itemKey, cItem, content)
+    _poolList.itemMap[itemKey] = cItem
+    table.insert(_poolList.useList, allIdKey)
+    cItem.transform:SetParent(content);
+    if self.onInitCallBack ~= nil then
+        self.onInitCallBack()
+    end
+end
+
+function GridList:unUseItem(_poolList, itemKey)
+    for k , v in pairs(_poolList.useList) do
+        if k == itemKey then
+            table.remove(_poolList.useList, k)
+            break
+        end
+    end
+    table.insert(_poolList.unUseList, itemKey)
+    return _poolList.itemMap[itemKey]
+end
+
+function GridList:getItem(_poolList)
+    local itemKey = _poolList.unUseList[#_poolList.unUseList]
+    table.remove(_poolList.unUseList, #_poolList.unUseList)
+    table.insert(_poolList.useList, itemKey)
+    return itemKey
+end
+
+function GridList:createItem(path)
+    local p = Resources.Load(path)
+    local go = GameObject.Instantiate(p,Vector3.zero,Quaternion.identity)
+    return go
+end
+
+function GridList:stepKey()
+    --这个ID实在不可能越界
+    self.allKey = self.allKey + 1
+    if self.allKey < 0 then
+        --重新分配一次索引
+    end
+end
+
+function GridList:findItem(path, nType, content)
+    local itemKey
+    local cItem
+    local poolList = self.poolMap[nType]
+    if poolList ~= nil then
+        if #poolList.unUseList > 0 then
+            itemKey = self:getItem(poolList)
+            cItem = poolList.itemMap[itemKey]
+        else
+            cItem = self:createItem(path)
+            self:stepKey()
+            itemKey = self.allKey
+            self:appendItem(poolList, itemKey, cItem, content)
+        end
+    else
+        poolList = {}
+        poolList.itemMap = {}
+        poolList.useList = {}
+        poolList.unUseList = {}
+        self.poolMap[nType] = poolList
+        self:stepKey()
+        itemKey = self.allKey
+        cItem = self:createItem(path)
+        self:appendItem(poolList, itemKey, cItem, content)
+    end
+    cItem:SetActive(true);
+    return itemKey
+end
+
+function GridList:sample()
+    local ll =  self.gridLayout:getDataList()
+    for i=1 , 10 do
+        local b = GridDataSource()
+        b.templateId = i % 2
+        ll:Add(b)
+    end
+    self.gridLayout:initData()
+    self.gridLayout:setViewIndex(0, true);
+end
+
+return GridList

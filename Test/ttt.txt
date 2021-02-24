@@ -1,0 +1,99 @@
+function moveAllRankNode()
+	
+	for i=1 ,#allRank do
+		loca rank = TableGet
+		self:moveRankNode(rank)
+	end
+
+end
+
+function moveRankNode(rank, allRankNum)
+	local allRankNum
+	local findIndex
+	local findReplace
+	local toIndex
+	local toReplace
+
+	for allIndex , node in ipairs(allList) do
+		local rankProgress = math.floor((allRankNum - rank) /allRankNum * 10000)
+
+		--同一个节点
+		if isSameNode(node, rank) then
+			if indexValid(findIndex, findReplace) then
+				if node.rankAndProgressOverlay then
+					findReplace	 = allIndex  
+				else
+					findIndex = allIndex  
+				end
+			end
+		end
+		
+		--可插入
+		if indexValid(toIndex, toReplace) then
+			toIndex,toReplace = updateRankNode(node,allIndex, rank, rankProgress )
+		end
+
+		local myOk = indexValid(findIndex, findReplace)
+		local posOK = indexValid(toIndex, toReplace)
+		if myOk and posOK then
+			break
+		end 
+	end
+
+	if findIndex ~= nil and toIndex ~= nil then
+		if findIndex > toIndex then
+			local tmp = allList[findIndex]
+			table.remove(allList, findIndex)
+			table.insert(allList, toIndex-1, tmp)
+		else
+			table.remove(allList, findIndex)
+			table.insert(allList, toIndex, tmp)
+		end
+	elseif findIndex ~= nil and toReplace ~= nil then
+		allList[toReplace] = false
+		table.remove(allList, findIndex)
+	elseif findReplace ~= nil and toIndex ~= nil then
+		local newNode = {}
+		table.insert(allList, toIndex, newNode)
+		allList[findReplace] = false
+	elseif findReplace ~= nil and toReplace ~= nil then
+		allList[findReplace] = false
+		allList[toReplace] = true
+	else
+		if findIndex ~= nil then
+			table.remove(allList, findIndex)
+		elseif findReplace ~= nil then
+			allList[findReplace] = false
+		end
+
+		if toIndex ~= nil then
+			local newNode = {}
+			table.insert(allList, toIndex, newNode)
+		elseif toReplace ~= nil then
+			allList[toReplace] = true
+		end
+	end
+
+end
+
+function indexValid(index1, index2)
+	return index1 ~= nil or index2 ~= nil
+end
+
+function isSameNode(node, rank, rankSortProgress)
+	return node.rank == rank then
+end
+
+function updateRankNode(node, allIndex, rank, rankSortProgress)
+	local toIndex,toReplace
+	if node.sortProgress < rankSortProgress then
+		toIndex = rankIndex
+	elseif node.sortProgress == rankSortProgress then
+		if not node.isOverlay then
+			toReplace = rankIndex
+		elseif allRankNum - node.rank < allRankNum - rank then
+			toIndex = rankIndex
+		end
+	end
+	return toIndex, toReplace
+end
